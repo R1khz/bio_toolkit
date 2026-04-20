@@ -1,0 +1,361 @@
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
+from Bio.SeqUtils import gc_fraction
+from Bio.SeqUtils.MeltingTemp import Tm_Wallace
+from Bio.SeqUtils.ProtParam import ProteinAnalysis
+
+VALID_DNA_CHARS = set("ATCGNRYSWKMBDHVN-")
+VALID_RNA_CHARS = set("AUCGNRYSWKMBDHVN-")
+VALID_PROT_CHARS = set("ACDEFGHIKLMNPQRSTVWYBZX*-")
+
+RESTRICTION_SITES = {
+    "EcoRI": "GAATTC",
+    "BamHI": "GGATCC",
+    "HindIII": "AAGCTT",
+    "NotI": "GCGGCCGC",
+    "XhoI": "CTCGAG",
+    "NcoI": "CCATGG",
+    "SalI": "GTCGAC",
+    "XbaI": "TCTAGA",
+    "SphI": "GCATGC",
+    "PstI": "CTGCAG",
+    "SmaI": "CCCGGG",
+    "KpnI": "GGTACC",
+    "SacI": "GAGCTC",
+    "ClaI": "ATCGAT",
+    "NheI": "GCTAGC",
+}
+
+
+class SequenceAnalyzer:
+    def __init__(self, *, min_orf_aa: int = 30) -> None:
+        self.min_orf_aa = min_orf_aa
+
+    def analyze_records(self, records: list[SeqRecord]) -> list[dict[str, Any]]:
+        return [self.analyze_record(record) for record in records]
+
+    def analyze_record(self, record: SeqRecord) -> dict[str, Any]:
+        molecule_type = detect_molecule_type(record)
+        result = {
+            "sequence_id": record.id,
+            "description": record.description,
+            "molecule_type": molecule_type,
+            "analysis": {
+                "basic_stats": self._basic_stats(record, molecule_type),
+            },
+        }
+
+        if molecule_type in {"DNA", "RNA"}:
+            result["analysis"]["motifs"] = self._motif_analysis(record)
+            result["analysis"]["orfs"] = self._orf_analysis(record)
+        else:
+            result["analysis"]["motifs"] = {
+                "skipped": True,
+                "reason": f"Motif analysis does not apply to {molecule_type.lower()} sequences.",
+            }
+            result["analysis"]["orfs"] = {
+                "skipped": True,
+                "reason": f"ORF analysis does not apply to {molecule_type.lower()} sequences.",
+            }
+
+        return result
+
+    def _basic_stats(self, record: SeqRecord, molecule_type: str) -> dict[str, Any]:
+        if molecule_type == "PROTEIN":
+            return _analyze_protein(record)
+        return _analyze_nucleotide(record)
+
+    def _motif_analysis(self, record: SeqRecord) -> dict[str, Any]:
+        seq = _normalized_nucleotide(record)
+        restriction_sites = []
+        for enzyme, pattern in RESTRICTION_SITES.items():
+            positions = [match.start() for match in re.finditer(f"(?={pattern})", seq)]
+            if positions:
+                restriction_sites.append(
+                    {
+                        "enzyme": enzyme,
+                        "pattern": pattern,
+                        "positions": positions,
+                        "count": len(positions),
+                    }
+                )
+
+        kozak_pattern = r"GCC[AG]CCATGG"
+        kozak_sequences = [
+            {"position": match.start(), "sequence": match.group()}
+            for match in re.finditer(kozak_pattern, seq)
+        ]
+
+        return {
+            "restriction_sites": restriction_sites,
+            "kozak_sequences": kozak_sequences,
+            "cpg_dinucleotides": seq.count("CG"),
+            "cpg_islands_approx": _count_cpg_islands(seq),
+        }
+
+    def _orf_analysis(self, record: SeqRecord) -> dict[str, Any]:
+        seq = Seq(_normalized_nucleotide(record))
+        reverse = seq.reverse_complement()
+        frames = [
+            (seq, "+1", 0),
+            (seq[1:], "+2", 1),
+            (seq[2:], "+3", 2),
+            (reverse, "-1", 0),
+            (reverse[1:], "-2", 1),
+            (reverse[2:], "-3", 2),
+        ]
+
+        orfs = []
+        for frame_seq, frame_name, offset in frames:
+            aa_sequence = _translate_frame(frame_seq)
+            start = 0
+            while True:
+                methionine_index = aa_sequence.find("M", start)
+                if methionine_index == -1:
+                    break
+
+                stop_index = aa_sequence.find("*", methionine_index)
+                if stop_index == -1:
+                    break
+
+                protein = aa_sequence[methionine_index:stop_index]
+                if len(protein) >= self.min_orf_aa:
+                    orfs.append(
+                        {
+                            "frame": frame_name,
+                            "start_nt": methionine_index * 3 + offset,
+                            "end_nt": stop_index * 3 + offset,
+                            "length_aa": len(protein),
+                            "protein_preview": protein[:50] + ("..." if len(protein) > 50 else ""),
+                        }
+                    )
+
+                start = methionine_index + 1
+
+        sorted_orfs = sorted(orfs, key=lambda item: item["length_aa"], reverse=True)
+        return {
+            "orfs_found": len(sorted_orfs),
+            "longest_orf": sorted_orfs[0] if sorted_orfs else None,
+            "all_orfs": sorted_orfs[:10],
+            "min_orf_aa": self.min_orf_aa,
+        }
+
+
+def compare_sequence_records(records: list[dict[str, Any]]) -> dict[str, Any]:
+    if len(records) < 2:
+        raise ValueError("Comparison requires at least two analyzed records.")
+
+    molecule_types = sorted({str(record["molecule_type"]) for record in records})
+    lengths = [int(record["analysis"]["basic_stats"].get("length", 0)) for record in records]
+
+    nucleotide_records = [record for record in records if record["molecule_type"] in {"DNA", "RNA"}]
+    protein_records = [record for record in records if record["molecule_type"] == "PROTEIN"]
+
+    result: dict[str, Any] = {
+        "record_count": len(records),
+        "molecule_types": molecule_types,
+        "all_same_molecule_type": len(molecule_types) == 1,
+        "length": _range_summary(lengths),
+        "nucleotide": None,
+        "protein": None,
+    }
+
+    if nucleotide_records:
+        gc_values = [
+            float(record["analysis"]["basic_stats"].get("gc_content", 0.0))
+            for record in nucleotide_records
+        ]
+        orf_counts = [
+            int(record["analysis"]["orfs"].get("orfs_found", 0)) for record in nucleotide_records
+        ]
+        restriction_counts = [
+            len(record["analysis"]["motifs"].get("restriction_sites", []))
+            for record in nucleotide_records
+        ]
+        cpg_counts = [
+            int(record["analysis"]["motifs"].get("cpg_dinucleotides", 0))
+            for record in nucleotide_records
+        ]
+        result["nucleotide"] = {
+            "record_count": len(nucleotide_records),
+            "gc_content": _range_summary(gc_values),
+            "orf_count": _range_summary(orf_counts),
+            "restriction_site_hits": _range_summary(restriction_counts),
+            "cpg_dinucleotides": _range_summary(cpg_counts),
+        }
+
+    if protein_records:
+        molecular_weight_values = [
+            value
+            for value in (
+                record["analysis"]["basic_stats"].get("molecular_weight") for record in protein_records
+            )
+            if isinstance(value, (int, float))
+        ]
+        pi_values = [
+            value
+            for value in (
+                record["analysis"]["basic_stats"].get("isoelectric_point") for record in protein_records
+            )
+            if isinstance(value, (int, float))
+        ]
+        instability_values = [
+            value
+            for value in (
+                record["analysis"]["basic_stats"].get("instability_index") for record in protein_records
+            )
+            if isinstance(value, (int, float))
+        ]
+        result["protein"] = {
+            "record_count": len(protein_records),
+            "molecular_weight": _range_summary(molecular_weight_values),
+            "isoelectric_point": _range_summary(pi_values),
+            "instability_index": _range_summary(instability_values),
+        }
+
+    return result
+
+
+def detect_molecule_type(record: SeqRecord) -> str:
+    sequence = str(record.seq).upper().replace("-", "").replace("N", "")
+    chars = set(sequence)
+    if not chars:
+        return "UNKNOWN"
+    if chars <= VALID_RNA_CHARS and "U" in chars:
+        return "RNA"
+    if chars <= VALID_DNA_CHARS:
+        return "DNA"
+    if chars <= VALID_PROT_CHARS:
+        return "PROTEIN"
+    return "UNKNOWN"
+
+
+def _analyze_nucleotide(record: SeqRecord) -> dict[str, Any]:
+    sequence = str(record.seq).upper()
+    length = len(sequence)
+    composition = {base: sequence.count(base) for base in "ATCGU"}
+    gc_content = round(gc_fraction(record.seq) * 100, 2)
+
+    result: dict[str, Any] = {
+        "length": length,
+        "gc_content": gc_content,
+        "at_content": round(100 - gc_content, 2),
+        "base_composition": {base: count for base, count in composition.items() if count > 0},
+        "n_count": sequence.count("N"),
+    }
+
+    if length <= 10_000 and "N" not in sequence and set(sequence) <= set("ATCG"):
+        try:
+            result["melting_temp_tm"] = round(float(Tm_Wallace(record.seq)), 2)
+        except Exception:
+            result["melting_temp_tm"] = None
+
+    return result
+
+
+def _analyze_protein(record: SeqRecord) -> dict[str, Any]:
+    sequence = str(record.seq).upper().replace("*", "")
+    clean_sequence = _clean_protein_sequence(sequence)
+    result: dict[str, Any] = {
+        "length": len(sequence),
+        "amino_acid_count": _amino_acid_composition(sequence),
+    }
+
+    if clean_sequence:
+        try:
+            analysis = ProteinAnalysis(clean_sequence)
+            instability = analysis.instability_index()
+            result["molecular_weight"] = round(analysis.molecular_weight(), 2)
+            result["isoelectric_point"] = round(analysis.isoelectric_point(), 2)
+            result["instability_index"] = round(instability, 2)
+            result["gravy"] = round(analysis.gravy(), 4)
+            result["aromaticity"] = round(analysis.aromaticity(), 4)
+            result["is_stable"] = instability < 40
+        except Exception:
+            pass
+
+    return result
+
+
+def _amino_acid_composition(sequence: str) -> dict[str, int]:
+    aa_names = {
+        "A": "Ala",
+        "R": "Arg",
+        "N": "Asn",
+        "D": "Asp",
+        "C": "Cys",
+        "E": "Glu",
+        "Q": "Gln",
+        "G": "Gly",
+        "H": "His",
+        "I": "Ile",
+        "L": "Leu",
+        "K": "Lys",
+        "M": "Met",
+        "F": "Phe",
+        "P": "Pro",
+        "S": "Ser",
+        "T": "Thr",
+        "W": "Trp",
+        "Y": "Tyr",
+        "V": "Val",
+    }
+    return {name: sequence.count(code) for code, name in aa_names.items() if sequence.count(code) > 0}
+
+
+def _clean_protein_sequence(sequence: str) -> str:
+    valid = set("ACDEFGHIKLMNPQRSTVWY")
+    return "".join(amino_acid for amino_acid in sequence if amino_acid in valid)
+
+
+def _normalized_nucleotide(record: SeqRecord) -> str:
+    return str(record.seq).upper().replace("U", "T")
+
+
+def _count_cpg_islands(sequence: str) -> int:
+    window = 200
+    islands = 0
+    in_island = False
+
+    for start in range(0, len(sequence) - window, 50):
+        chunk = sequence[start : start + window]
+        if len(chunk) < window:
+            break
+
+        gc_ratio = (chunk.count("G") + chunk.count("C")) / window
+        cpg_ratio = chunk.count("CG") / window
+        if gc_ratio > 0.5 and cpg_ratio > 0.6:
+            if not in_island:
+                islands += 1
+                in_island = True
+        else:
+            in_island = False
+
+    return islands
+
+
+def _translate_frame(sequence: Seq) -> str:
+    usable_length = len(sequence) - (len(sequence) % 3)
+    if usable_length <= 0:
+        return ""
+    return str(sequence[:usable_length].translate(to_stop=False))
+
+
+def _range_summary(values: list[int | float]) -> dict[str, int | float] | None:
+    if not values:
+        return None
+
+    minimum = min(values)
+    maximum = max(values)
+    delta = maximum - minimum
+
+    return {
+        "min": round(minimum, 4) if isinstance(minimum, float) else minimum,
+        "max": round(maximum, 4) if isinstance(maximum, float) else maximum,
+        "delta": round(delta, 4) if isinstance(delta, float) else delta,
+    }
