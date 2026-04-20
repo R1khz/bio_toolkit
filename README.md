@@ -6,7 +6,7 @@ It is intentionally small, but it is built like a real software project: package
 
 ## Status
 
-The v1 core workflow is complete and usable, and the first expansion milestone is already underway.
+The v1 core workflow and the first expansion milestone are complete and usable.
 
 Today the toolkit can:
 
