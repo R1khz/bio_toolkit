@@ -105,7 +105,9 @@ def subsequence_record(record: SeqRecord, *, start: int = 1, end: int | None = N
     return SeqRecord(
         sliced,
         id=f"{record.id}|subseq_{start}_{resolved_end}",
-        name=f"{record.name}|subseq_{start}_{resolved_end}" if record.name else f"{record.id}|subseq_{start}_{resolved_end}",
+        name=f"{record.name}|subseq_{start}_{resolved_end}"
+        if record.name
+        else f"{record.id}|subseq_{start}_{resolved_end}",
         description=f"subsequence {start}-{resolved_end} of {record.description or record.id}",
     )
 

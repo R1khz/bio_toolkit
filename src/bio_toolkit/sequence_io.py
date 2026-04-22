@@ -62,7 +62,8 @@ def detect_input_format(
         return "genbank"
 
     raise SequenceIOError(
-        "Could not detect input format automatically. Use --input-format fasta or --input-format genbank."
+        "Could not detect input format automatically. Use --input-format fasta or "
+        "--input-format genbank."
     )
 
 

@@ -13,9 +13,17 @@
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+python -m ensurepip --upgrade
 pip install --upgrade pip
 pip install -e ".[dev]"
 cp .env.example .env
+python -m bio_toolkit doctor
+```
+
+If the repository is moved or copied after installation, reinstall the editable package from the new path:
+
+```bash
+./.venv/bin/python -m pip install -e ".[dev]"
 ```
 
 Required environment variables:
@@ -33,6 +41,7 @@ Recommended environment variables:
 - `pytest` for tests
 - `ruff` for linting and formatting
 - `pyproject.toml` as the single Python project config entrypoint
+- `make lint`, `make test`, and `make doctor` use the repo-local `.venv`
 
 ## Expected Workflow
 
@@ -49,4 +58,3 @@ Recommended environment variables:
 3. Add local cache behavior
 4. Add sequence analysis commands
 5. Polish terminal output and package ergonomics
-

@@ -1,9 +1,7 @@
-import os
 import sys
 import tempfile
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"
@@ -160,10 +158,10 @@ class NcbiTests(unittest.TestCase):
 
     def test_parse_blast_csv_rows(self) -> None:
         hits = parse_blast_tabular_csv(
-            (
+            
                 "queryA,P68871.2,100.000,147,0,0,1,147,1,147,5.82e-106,301,100.00\n"
                 "queryA,P02024.2,99.320,147,1,0,1,147,1,147,2.03e-105,300,100.00\n"
-            )
+            
         )
 
         self.assertEqual(len(hits), 2)

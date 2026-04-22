@@ -1,12 +1,11 @@
 import sys
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"

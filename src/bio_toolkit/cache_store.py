@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -156,7 +156,11 @@ class CacheStore:
         file_suffix: str,
     ) -> Path:
         safe_accession = _safe_filename(accession)
-        return Path(validate_database(database)) / normalize_rettype(rettype) / f"{safe_accession}{file_suffix}"
+        return (
+            Path(validate_database(database))
+            / normalize_rettype(rettype)
+            / f"{safe_accession}{file_suffix}"
+        )
 
 
 def build_cache_key(accession: str, database: str, rettype: str) -> str:
@@ -168,4 +172,4 @@ def _safe_filename(value: str) -> str:
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()

@@ -66,7 +66,9 @@ def extract_record_annotation(
         "gene_names": genes,
         "product_names": products,
         "feature_count": len(record.features),
-        "feature_counts": dict(sorted(feature_counts.items(), key=lambda item: (-item[1], item[0]))),
+        "feature_counts": dict(
+            sorted(feature_counts.items(), key=lambda item: (-item[1], item[0]))
+        ),
         "selected_features": selected_features,
     }
 

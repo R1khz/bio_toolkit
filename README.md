@@ -1,6 +1,6 @@
 # Bio Toolkit
 
-Bio Toolkit is a Linux-first command line toolkit for finding, fetching, caching, and analyzing biological sequences from NCBI and local files.
+Bio Toolkit is a Linux-first command line toolkit for finding, fetching, caching, and analyzing biological sequences from NCBI, UniProt, KEGG, and local files.
 
 It is intentionally small, but it is built like a real software project: package metadata, environment configuration, tests, documentation, modular source code, and a clear CLI workflow.
 
@@ -10,10 +10,14 @@ The v1 core workflow and the first expansion milestone are complete and usable.
 
 Today the toolkit can:
 
+- run a guided `start` flow that asks what to search and what to do next
 - search NCBI `nucleotide` and `protein` databases from the terminal
+- search UniProt for protein records
+- search KEGG for genes, pathways, KO terms, enzymes, or diseases
 - filter searches by organism
 - preview search results in readable terminal tables
 - interactively move through search results in a TTY and choose what to do next with `--pick`
+- choose provider-aware quick actions such as annotate, BLAST, or AlphaFold lookup
 - fetch records by accession in `fasta` or `genbank`
 - save fetched records to local files
 - store fetched records in a reusable local cache with metadata
@@ -29,6 +33,8 @@ Today the toolkit can:
 - compute core sequence statistics
 - review restriction sites, Kozak motifs, and CpG counts for nucleotide sequences
 - scan ORFs across six reading frames for nucleotide sequences
+- surface heuristic protein domain hits
+- enrich protein analyses with UniProt domains and AlphaFold metadata when a UniProt accession is available
 - export analysis reports as JSON
 - export annotation reports as JSON, CSV, Markdown, or HTML
 - export BLAST results as JSON, CSV, or TSV
@@ -41,9 +47,11 @@ Today the toolkit can:
 Validates local runtime configuration:
 
 - `.env` presence
+- runtime root detection
 - `NCBI_EMAIL`
 - `NCBI_API_KEY`
 - cache and output directories
+- package import path and install mode
 - detected platform and Python version
 - color mode
 
@@ -55,25 +63,47 @@ Examples:
 ./bio-toolkit --plain doctor
 ```
 
-### `search`
+### `start`
 
-Searches NCBI from the terminal.
+Runs a guided search and action picker.
 
 Current capabilities:
 
-- `nucleotide` or `protein` databases
+- ask what to search
+- ask where to search: `auto`, `ncbi`, `uniprot`, or `kegg`
+- auto-detect literal DNA, RNA, or protein sequences and analyze them directly
+- show results in a picker and launch a provider-aware follow-up action
+
+Examples:
+
+```bash
+./bio-toolkit start
+./bio-toolkit --plain start
+```
+
+### `search`
+
+Searches NCBI, UniProt, or KEGG from the terminal.
+
+Current capabilities:
+
+- provider selection with `--provider ncbi|uniprot|kegg|auto`
+- `nucleotide` or `protein` databases for NCBI
+- `genes`, `pathway`, `ko`, `enzyme`, or `disease` databases for KEGG
 - free-text queries
 - optional organism filter
 - adjustable result limit
 - terminal table output
 - JSON output
 - interactive picker mode in TTY-capable terminals
-- direct follow-up actions after selection: print accession, fetch, or fetch and analyze
+- direct follow-up actions after selection: print accession, fetch, analyze, annotate, BLAST, AlphaFold lookup, or fetch and analyze depending on provider
 
 Examples:
 
 ```bash
 ./bio-toolkit search "SpoIIIAA" --database protein
+./bio-toolkit search "P69905" --provider uniprot
+./bio-toolkit search "hsa:10458" --provider auto
 ./bio-toolkit search "SpoIIIAA" --database protein --organism "Bacillus subtilis"
 ./bio-toolkit search "SpoIIIAA" --database protein --organism "Bacillus subtilis" --pick
 ./bio-toolkit search "BRCA1" --database nucleotide --limit 5
@@ -139,11 +169,16 @@ Current capabilities:
 - detect sequence type
 - compute length and composition metrics
 - compute GC and AT content for nucleotide sequences
+- surface warnings for short, ambiguous, or otherwise suspicious sequences
 - compute protein metrics such as molecular weight and pI for protein sequences
+- show protein domain summaries for protein inputs
+- enrich protein reports with UniProt domains and AlphaFold metadata when the input resolves to a UniProt accession
 - scan motifs for nucleotide sequences
 - scan ORFs in six frames for nucleotide sequences
+- show the longest ORF translation and its top codons for nucleotide sequences
+- search custom motifs with repeatable `--motif` flags
 - render structured terminal reports
-- export JSON reports
+- export analysis reports as JSON or CSV
 
 Examples:
 
@@ -151,7 +186,9 @@ Examples:
 ./bio-toolkit analyze outputs/NG_005905.fasta
 ./bio-toolkit analyze NG_005905 --source cache --database nucleotide --rettype fasta
 ./bio-toolkit analyze NG_005905 --source cache --database nucleotide --rettype fasta --json
+./bio-toolkit analyze outputs/NG_005905.fasta --motif GAATTC --motif 're:GCCACCATG'
 ./bio-toolkit analyze outputs/NG_005905.fasta --output outputs/NG_005905.analysis.json
+./bio-toolkit analyze outputs/NG_005905.fasta --output outputs/NG_005905.analysis.csv --export-format csv
 ./bio-toolkit --plain analyze outputs/NG_005905.fasta
 ```
 
@@ -253,7 +290,7 @@ Current capabilities:
 - fetch batches of accession inputs
 - continue through per-item failures unless `--fail-fast` is enabled
 - render a readable terminal summary table
-- export a JSON batch report
+- export batch reports as JSON or CSV
 
 Examples:
 
@@ -262,6 +299,7 @@ Examples:
 ./bio-toolkit batch inputs/files.txt --mode analyze --input-kind files
 ./bio-toolkit batch inputs/accessions.txt --mode fetch --input-kind accessions --database nucleotide
 ./bio-toolkit batch inputs/files.txt --mode analyze --input-kind files --output outputs/batch.analysis.json
+./bio-toolkit batch inputs/files.txt --mode analyze --input-kind files --output outputs/batch.analysis.csv --export-format csv
 ```
 
 ## Typical Workflows
@@ -349,6 +387,7 @@ python -m ensurepip --upgrade
 pip install --upgrade pip
 pip install -e ".[dev]"
 cp .env.example .env
+python -m bio_toolkit doctor
 ```
 
 ### Easiest Way To Run It
@@ -359,10 +398,17 @@ From the repository root:
 ./bio-toolkit
 ```
 
-If you prefer not to type `./`, activate the environment once:
+`./bio-toolkit` now verifies that the installed package resolves to this clone. If you move or copy the repository, rerun:
+
+```bash
+./.venv/bin/python -m pip install -e ".[dev]"
+```
+
+If you prefer not to type `./`, activate the environment once and use the installed entrypoints directly:
 
 ```bash
 source .venv/bin/activate
+python -m bio_toolkit doctor
 bio-toolkit search "SpoIIIAA" --database protein
 ```
 
@@ -382,14 +428,16 @@ Important variables:
 Notes:
 
 - if `BIO_TOOLKIT_CACHE_DIR` is unset, the default cache path is used
-- if a path in `.env` is relative, it is resolved from the repository root
+- if a path in `.env` is relative, it is resolved from the runtime root
+- the runtime root is the active repository root when you are inside a clone, otherwise the current working directory
+- `doctor` warns when the active repository and imported package point to different clones
 - `--plain` reduces color-rich output for constrained terminals or log-oriented sessions
 
 ## Command Summary
 
 | Command | Purpose | JSON Support | Notes |
 |---------|---------|--------------|-------|
-| `doctor` | inspect runtime configuration | no | can create runtime directories |
+| `doctor` | inspect runtime configuration | no | can create runtime directories and detect install mismatches |
 | `search` | search NCBI | yes | supports `nucleotide`, `protein`, and TTY picker mode |
 | `fetch` | fetch accession from NCBI | no | uses cache automatically unless `--refresh` |
 | `annotate` | inspect metadata and selected features | yes | supports JSON stdout and file export to JSON/CSV/Markdown/HTML |
@@ -465,6 +513,7 @@ Included today:
 - sequence transforms
 - remote BLAST from local or cached queries
 - JSON export
+- flat CSV export for analysis and batch summaries
 - CSV, Markdown, and HTML annotation export
 - JSON, CSV, and TSV BLAST export
 - polished terminal output
@@ -480,7 +529,8 @@ Not included yet:
 
 Good next steps after this milestone:
 
-- server-oriented local BLAST+ integration on Linux hosts that need it later
+- MySQL-backed run persistence built on the current analysis and batch report schemas
+- a small API surface on top of the existing analysis core once persistence needs settle
 - Snakemake-facing integration after the CLI workflow milestone is stable
 - compact text-only output mode only if server/log workflows demand it
 

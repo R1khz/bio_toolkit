@@ -35,6 +35,8 @@ class SearchResult:
     source_db: str
     uid: str
     length: int | None = None
+    provider: str = "ncbi"
+    database: str = ""
 
 
 @dataclass(frozen=True)
@@ -45,6 +47,7 @@ class FetchResult:
     content: str
     file_suffix: str
     source: str = "ncbi"
+    provider: str = "ncbi"
 
 
 @dataclass(frozen=True)
@@ -91,9 +94,7 @@ class NcbiClient:
         timeout_seconds: float = 20.0,
     ) -> None:
         if not email:
-            raise NcbiConfigurationError(
-                "NCBI_EMAIL is required before using NCBI commands."
-            )
+            raise NcbiConfigurationError("NCBI_EMAIL is required before using NCBI commands.")
 
         self.email = email
         self.tool_name = tool_name
@@ -101,7 +102,7 @@ class NcbiClient:
         self.timeout_seconds = timeout_seconds
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> "NcbiClient":
+    def from_settings(cls, settings: Settings) -> NcbiClient:
         return cls(
             email=settings.ncbi_email,
             tool_name=settings.ncbi_tool_name,
@@ -397,6 +398,8 @@ def _summary_to_result(summary: dict[str, Any], *, database: str) -> SearchResul
         source_db=source_db,
         uid=str(summary.get("uid", "")),
         length=length,
+        provider="ncbi",
+        database=database,
     )
 
 

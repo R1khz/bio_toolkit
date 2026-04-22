@@ -12,13 +12,33 @@ Recommended local launcher from the repo root:
 ./bio-toolkit
 ```
 
+### `python -m bio_toolkit start`
+
+Run a guided flow for provider selection, result picking, and quick follow-up actions.
+
+Examples:
+
+```bash
+./bio-toolkit start
+./bio-toolkit --plain start
+```
+
+Current behavior:
+
+- asks what to search and where to search
+- supports `auto`, `ncbi`, `uniprot`, and `kegg`
+- detects literal DNA, RNA, or protein sequences and analyzes them directly
+- opens the same interactive action picker used by `search --pick`
+
 ### `python -m bio_toolkit doctor`
 
 Prints runtime diagnostics for:
 
 - `.env` presence
+- runtime root detection
 - NCBI email and API key configuration
 - runtime cache and output directories
+- package import path, install mode, and active repo match
 - platform and Python version
 - color mode
 
@@ -30,14 +50,22 @@ Useful variants:
 ./bio-toolkit --plain doctor
 ```
 
+If `doctor` reports an active-repo mismatch, reinstall the current clone with:
+
+```bash
+./.venv/bin/python -m pip install -e ".[dev]"
+```
+
 ### `python -m bio_toolkit search`
 
-Search NCBI `nucleotide` and `protein` databases with terminal-friendly results.
+Search NCBI, UniProt, or KEGG with terminal-friendly results.
 
 Examples:
 
 ```bash
 ./bio-toolkit search "insulin" --database protein --organism "Homo sapiens"
+./bio-toolkit search "P69905" --provider uniprot
+./bio-toolkit search "hsa:10458" --provider auto
 ./bio-toolkit search "BRCA1" --database nucleotide --limit 5
 ./bio-toolkit search "SpoIIIAA" --database protein --organism "Bacillus subtilis" --pick
 ./bio-toolkit search "TP53" --json
@@ -48,7 +76,7 @@ TTY picker mode:
 - requires a TTY-capable terminal session
 - lets the user move through search results with arrow keys
 - supports direct follow-up actions after selection
-- current actions are: print accession, fetch, and fetch then analyze
+- current actions depend on provider and include: print accession, fetch, analyze, annotate, BLAST, AlphaFold lookup, and fetch then analyze
 
 ### `python -m bio_toolkit fetch`
 
@@ -74,6 +102,7 @@ Examples:
 ./bio-toolkit batch inputs/files.txt --mode analyze --input-kind files
 ./bio-toolkit batch inputs/accessions.txt --mode fetch --input-kind accessions --database nucleotide
 ./bio-toolkit batch inputs/files.txt --mode analyze --input-kind files --output outputs/batch.json
+./bio-toolkit batch inputs/files.txt --mode analyze --input-kind files --output outputs/batch.csv --export-format csv
 ```
 
 Current behavior:
@@ -82,7 +111,7 @@ Current behavior:
 - supports `analyze` and `fetch`
 - supports `auto`, `accessions`, and `files` input modes
 - continues on per-item failures unless `--fail-fast` is enabled
-- prints a Rich summary table and can emit JSON
+- prints a Rich summary table and can export JSON or CSV
 
 ### `python -m bio_toolkit annotate`
 
@@ -191,12 +220,25 @@ Examples:
 ./bio-toolkit analyze outputs/NG_005905.fasta
 ./bio-toolkit analyze NG_005905 --source cache --database nucleotide --rettype fasta
 ./bio-toolkit analyze NG_005905 --source cache --database nucleotide --rettype fasta --json
+./bio-toolkit analyze outputs/NG_005905.fasta --motif GAATTC --motif 're:GCCACCATG'
 ./bio-toolkit analyze outputs/NG_005905.fasta --output outputs/NG_005905.analysis.json
+./bio-toolkit analyze outputs/NG_005905.fasta --output outputs/NG_005905.analysis.csv --export-format csv
 ```
+
+Current behavior:
+
+- works on local files or cached accessions through the same analysis path
+- surfaces warnings for short, ambiguous, or unstable-looking inputs
+- reports ambiguous nucleotide content when present
+- shows longest-ORF translation and top codons for nucleotide records
+- shows protein domain summaries for protein records
+- enriches protein reports with UniProt domains and AlphaFold metadata when a UniProt accession is available
+- accepts repeatable `--motif` flags for literal motifs or `re:<regex>` patterns
+- supports JSON to stdout and JSON/CSV exports to files
 
 ## Future Commands
 
-Snakemake integration remains planned for a later milestone once the standalone CLI workflow is stable.
+MySQL-backed persistence and a small API surface are the next structural expansion targets once the standalone CLI workflow is stable.
 
 ## UX Direction
 

@@ -1,11 +1,10 @@
 import sys
 import tempfile
-from pathlib import Path
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from typer.testing import CliRunner
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"
@@ -66,17 +65,18 @@ class BlastCommandTests(unittest.TestCase):
             fasta = tmp_path / "query.fasta"
             export_path = tmp_path / "blast.csv"
             fasta.write_text(
-                (
-                    ">queryA\n"
-                    "MVHLTPEEKSAVTALWGKVNVDEVGGEALGRLLVVYPWTQRFFESFGDLSTPDAVMGNPKV\n"
-                ),
+                (">queryA\nMVHLTPEEKSAVTALWGKVNVDEVGGEALGRLLVVYPWTQRFFESFGDLSTPDAVMGNPKV\n"),
                 encoding="utf-8",
             )
 
             with patch("bio_toolkit.cli._build_ncbi_client", return_value=FakeBlastClient()):
                 with patch(
                     "bio_toolkit.cli._wait_for_remote_blast",
-                    return_value=(BlastSearchInfo(rid="TEST-RID-001", status="READY", there_are_hits=True), 60, 1),
+                    return_value=(
+                        BlastSearchInfo(rid="TEST-RID-001", status="READY", there_are_hits=True),
+                        60,
+                        1,
+                    ),
                 ):
                     result = self.runner.invoke(
                         app,

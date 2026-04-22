@@ -11,5 +11,22 @@ if [[ ! -x "$VENV_PYTHON" ]]; then
   exit 1
 fi
 
-export PYTHONPATH="$ROOT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
+if ! "$VENV_PYTHON" -c '
+import sys
+from pathlib import Path
+
+expected_root = Path(sys.argv[1]).resolve() / "src" / "bio_toolkit"
+try:
+    import bio_toolkit
+except ModuleNotFoundError:
+    raise SystemExit(1)
+
+package_root = Path(bio_toolkit.__file__).resolve().parent
+raise SystemExit(0 if package_root == expected_root else 1)
+' "$ROOT_DIR"; then
+  echo "Bio Toolkit is not installed for this clone, or the editable install is stale." >&2
+  echo "Run: ./.venv/bin/python -m pip install -e \".[dev]\"" >&2
+  exit 1
+fi
+
 exec "$VENV_PYTHON" -m bio_toolkit "$@"

@@ -1,15 +1,71 @@
 import sys
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from bio_toolkit.exporters import render_annotation_export, render_blast_export  # noqa: E402
+from bio_toolkit.exporters import (  # noqa: E402
+    render_analysis_export,
+    render_annotation_export,
+    render_batch_export,
+    render_blast_export,
+)
 
+ANALYSIS_REPORT = {
+    "source": {"kind": "file", "label": "/tmp/example.fasta"},
+    "input_format": "fasta",
+    "record_count": 1,
+    "records": [
+        {
+            "sequence_id": "seqA",
+            "description": "Example sequence",
+            "molecule_type": "DNA",
+            "analysis": {
+                "basic_stats": {
+                    "length": 18,
+                    "gc_content": 50.0,
+                    "at_content": 50.0,
+                    "n_count": 0,
+                    "ambiguous_count": 0,
+                    "ambiguous_content": 0.0,
+                    "melting_temp_tm": 54.0,
+                },
+                "motifs": {
+                    "restriction_sites": [{"enzyme": "EcoRI", "count": 1}],
+                    "kozak_sequences": [{"position": 0, "sequence": "GCCACCATGG"}],
+                    "cpg_dinucleotides": 2,
+                },
+                "orfs": {
+                    "orfs_found": 1,
+                    "longest_orf": {
+                        "frame": "+1",
+                        "length_aa": 5,
+                        "protein_sequence": "MELKI",
+                        "codon_usage": {"ATG": 1, "GAA": 1},
+                    },
+                },
+                "domains": {
+                    "domains_found": 2,
+                    "all_domains": [
+                        {"name": "Example domain", "start_aa": 2, "end_aa": 14},
+                        {"name": "UniProt repeat", "start_aa": 20, "end_aa": 30},
+                    ],
+                },
+                "external": {
+                    "alphafold": {
+                        "model_id": "AF-P69905-F1",
+                        "avg_plddt": 91.2,
+                    }
+                },
+                "custom_motifs": [{"label": "GAATTC", "count": 1}],
+                "warnings": ["Sequence is short; motif and ORF signals may be limited."],
+            },
+        }
+    ],
+}
 
 ANNOTATION_REPORT = {
     "source": {"kind": "file", "label": "/tmp/example.gb"},
@@ -53,7 +109,14 @@ BLAST_REPORT = {
         "record_count": 1,
         "query_kind": "protein",
         "molecule_types": ["PROTEIN"],
-        "records": [{"sequence_id": "queryA", "description": "Example", "molecule_type": "PROTEIN", "length": 147}],
+        "records": [
+            {
+                "sequence_id": "queryA",
+                "description": "Example",
+                "molecule_type": "PROTEIN",
+                "length": 147,
+            }
+        ],
     },
     "blast": {
         "rid": "TEST-RID-001",
@@ -87,8 +150,45 @@ BLAST_REPORT = {
     ],
 }
 
+BATCH_REPORT = {
+    "mode": "analyze",
+    "input_kind": "files",
+    "targets_file": "/tmp/targets.txt",
+    "database": "nucleotide",
+    "rettype": "fasta",
+    "total_items": 1,
+    "succeeded": 1,
+    "failed": 0,
+    "results": [
+        {
+            "item": "seq_a.fasta",
+            "status": "ok",
+            "operation": "analyze",
+            "source_kind": "file",
+            "label": "/tmp/seq_a.fasta",
+            "input_format": "fasta",
+            "record_count": 1,
+            "molecule_types": ["DNA"],
+            "analysis": ANALYSIS_REPORT,
+        }
+    ],
+}
+
 
 class ExporterTests(unittest.TestCase):
+    def test_renders_analysis_csv(self) -> None:
+        csv_text = render_analysis_export(ANALYSIS_REPORT, "csv")
+        self.assertIn("source_kind,source_label,input_format,sequence_id", csv_text)
+        self.assertIn("ambiguous_count", csv_text)
+        self.assertIn("custom_motifs", csv_text)
+        self.assertIn("domains_found", csv_text)
+        self.assertIn("alphafold_model_id", csv_text)
+        self.assertIn("seqA", csv_text)
+        self.assertIn("GAATTC(1)", csv_text)
+        self.assertIn("ATG:1; GAA:1", csv_text)
+        self.assertIn("Example domain", csv_text)
+        self.assertIn("AF-P69905-F1", csv_text)
+
     def test_renders_csv(self) -> None:
         csv_text = render_annotation_export(ANNOTATION_REPORT, "csv")
         self.assertIn("accession,sequence_id,description", csv_text)
@@ -117,6 +217,13 @@ class ExporterTests(unittest.TestCase):
         tsv_text = render_blast_export(BLAST_REPORT, "tsv")
         self.assertIn("rid\tprogram\tblast_database", tsv_text)
         self.assertIn("queryA\tP68871.2", tsv_text)
+
+    def test_renders_batch_csv(self) -> None:
+        csv_text = render_batch_export(BATCH_REPORT, "csv")
+        self.assertIn("item,operation,status,source_kind,source_label", csv_text)
+        self.assertIn("warning_count", csv_text)
+        self.assertIn("seq_a.fasta", csv_text)
+        self.assertIn("seqA", csv_text)
 
 
 if __name__ == "__main__":

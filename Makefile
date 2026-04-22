@@ -1,21 +1,24 @@
 .PHONY: setup lint format test run doctor
 
+VENV_PYTHON := .venv/bin/python
+
 setup:
 	python3 -m venv .venv
-	. .venv/bin/activate && pip install --upgrade pip && pip install -e ".[dev]"
+	$(VENV_PYTHON) -m ensurepip --upgrade
+	$(VENV_PYTHON) -m pip install --upgrade pip
+	$(VENV_PYTHON) -m pip install -e ".[dev]"
 
 lint:
-	ruff check .
+	$(VENV_PYTHON) -m ruff check .
 
 format:
-	ruff format .
+	$(VENV_PYTHON) -m ruff format .
 
 test:
-	pytest
+	$(VENV_PYTHON) -m pytest
 
 run:
-	python -m bio_toolkit
+	$(VENV_PYTHON) -m bio_toolkit
 
 doctor:
-	python -m bio_toolkit doctor
-
+	$(VENV_PYTHON) -m bio_toolkit doctor

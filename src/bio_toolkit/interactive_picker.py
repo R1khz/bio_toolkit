@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 
 from bio_toolkit.ncbi import SearchResult
@@ -39,15 +40,42 @@ def pick_post_search_action(result: SearchResult) -> str:
     questionary = _load_questionary()
     _ensure_tty()
 
-    answer = questionary.select(
-        f"What do you want to do with {result.accession}?",
-        choices=[
+    provider = getattr(result, "provider", "ncbi").strip().lower()
+    if provider == "uniprot":
+        choices = [
             questionary.Choice("Fetch and save", value="fetch"),
+            questionary.Choice("Analyze now", value="analyze"),
+            questionary.Choice("BLAST now", value="blast"),
+            questionary.Choice("Show AlphaFold model", value="alphafold"),
             questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
             questionary.Choice("Print accession only", value="print_accession"),
             questionary.Separator(),
             questionary.Choice("Cancel", value=None),
-        ],
+        ]
+    elif provider == "kegg":
+        choices = [
+            questionary.Choice("Fetch and save", value="fetch"),
+            questionary.Choice("Analyze now", value="analyze"),
+            questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
+            questionary.Choice("Print accession only", value="print_accession"),
+            questionary.Separator(),
+            questionary.Choice("Cancel", value=None),
+        ]
+    else:
+        choices = [
+            questionary.Choice("Fetch and save", value="fetch"),
+            questionary.Choice("Analyze now", value="analyze"),
+            questionary.Choice("Annotate now", value="annotate"),
+            questionary.Choice("BLAST now", value="blast"),
+            questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
+            questionary.Choice("Print accession only", value="print_accession"),
+            questionary.Separator(),
+            questionary.Choice("Cancel", value=None),
+        ]
+
+    answer = questionary.select(
+        f"What do you want to do with {result.accession}?",
+        choices=choices,
         instruction="Use arrows to move, Enter to confirm",
         use_indicator=True,
     ).ask()
@@ -63,6 +91,94 @@ def format_search_choice(result: SearchResult) -> str:
     return f"{result.accession} | {organism} | {result.source_db} | {length} | {result.title}"
 
 
+def prompt_guided_search() -> dict[str, str | int]:
+    questionary = _load_questionary()
+    _ensure_tty()
+
+    query = questionary.text("What do you want to search for?").ask()
+    if query is None or not str(query).strip():
+        raise InteractivePickerCancelled("Guided search cancelled.")
+
+    provider = questionary.select(
+        "Where do you want to search?",
+        choices=[
+            questionary.Choice("Auto", value="auto"),
+            questionary.Choice("NCBI", value="ncbi"),
+            questionary.Choice("UniProt", value="uniprot"),
+            questionary.Choice("KEGG", value="kegg"),
+            questionary.Separator(),
+            questionary.Choice("Cancel", value=None),
+        ],
+        instruction="Use arrows to move, Enter to confirm",
+        use_indicator=True,
+    ).ask()
+    if provider is None:
+        raise InteractivePickerCancelled("Guided search cancelled.")
+
+    if str(provider) == "ncbi":
+        database = questionary.select(
+            "Which NCBI database?",
+            choices=[
+                questionary.Choice("Nucleotide", value="nucleotide"),
+                questionary.Choice("Protein", value="protein"),
+                questionary.Separator(),
+                questionary.Choice("Cancel", value=None),
+            ],
+            instruction="Use arrows to move, Enter to confirm",
+            use_indicator=True,
+        ).ask()
+        if database is None:
+            raise InteractivePickerCancelled("Guided search cancelled.")
+        organism = questionary.text("Organism filter (optional)", default="").ask()
+        if organism is None:
+            raise InteractivePickerCancelled("Guided search cancelled.")
+    elif str(provider) == "kegg":
+        database = questionary.select(
+            "Which KEGG database?",
+            choices=[
+                questionary.Choice("Genes", value="genes"),
+                questionary.Choice("Pathway", value="pathway"),
+                questionary.Choice("KO", value="ko"),
+                questionary.Choice("Enzyme", value="enzyme"),
+                questionary.Choice("Disease", value="disease"),
+                questionary.Separator(),
+                questionary.Choice("Cancel", value=None),
+            ],
+            instruction="Use arrows to move, Enter to confirm",
+            use_indicator=True,
+        ).ask()
+        if database is None:
+            raise InteractivePickerCancelled("Guided search cancelled.")
+        organism = ""
+    elif str(provider) == "uniprot":
+        database = "protein"
+        organism = questionary.text("Organism filter (optional)", default="").ask()
+        if organism is None:
+            raise InteractivePickerCancelled("Guided search cancelled.")
+    else:
+        database = "nucleotide"
+        organism = questionary.text("Organism filter (optional)", default="").ask()
+        if organism is None:
+            raise InteractivePickerCancelled("Guided search cancelled.")
+
+    limit_text = questionary.text("How many results?", default="10").ask()
+    if limit_text is None:
+        raise InteractivePickerCancelled("Guided search cancelled.")
+
+    try:
+        limit = int(str(limit_text).strip())
+    except ValueError as exc:
+        raise InteractivePickerError("Guided search limit must be a whole number.") from exc
+
+    return {
+        "query": str(query).strip(),
+        "provider": str(provider),
+        "database": str(database),
+        "organism": str(organism).strip(),
+        "limit": limit,
+    }
+
+
 def _ensure_tty() -> None:
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         raise InteractivePickerError(
@@ -71,6 +187,7 @@ def _ensure_tty() -> None:
 
 
 def _load_questionary():
+    os.environ.setdefault("PROMPT_TOOLKIT_NO_CPR", "1")
     try:
         import questionary
     except ImportError as exc:  # pragma: no cover - dependency/runtime issue

@@ -1,7 +1,6 @@
 import ast
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CLI_FILE = ROOT / "src" / "bio_toolkit" / "cli.py"
@@ -18,13 +17,28 @@ class CliContractTests(unittest.TestCase):
 
             for decorator in node.decorator_list:
                 if isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Attribute):
-                    if isinstance(decorator.func.value, ast.Name) and decorator.func.value.id == "app":
+                    if (
+                        isinstance(decorator.func.value, ast.Name)
+                        and decorator.func.value.id == "app"
+                    ):
                         if decorator.func.attr == "command":
                             commands.add(node.name)
 
         self.assertEqual(
             commands,
-            {"doctor", "search", "fetch", "batch", "analyze", "annotate", "compare", "transform", "blast", "cache"},
+            {
+                "doctor",
+                "start",
+                "search",
+                "fetch",
+                "batch",
+                "analyze",
+                "annotate",
+                "compare",
+                "transform",
+                "blast",
+                "cache",
+            },
         )
 
     def test_cli_has_plain_option_in_callback(self) -> None:

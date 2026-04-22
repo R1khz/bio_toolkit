@@ -2,9 +2,8 @@ import importlib.util
 import os
 import sys
 import tempfile
-from pathlib import Path
 import unittest
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG_FILE = ROOT / "src" / "bio_toolkit" / "config.py"
@@ -86,6 +85,32 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(settings.cache_dir, ROOT / ".cache" / "bio-toolkit")
         self.assertEqual(settings.output_dir, ROOT / "outputs")
+        self.assertEqual(settings.runtime_root, ROOT)
+
+    def test_find_active_repo_root_from_nested_path(self) -> None:
+        nested_path = ROOT / "src" / "bio_toolkit"
+
+        active_repo_root = self.config.find_active_repo_root(nested_path)
+
+        self.assertEqual(active_repo_root, ROOT)
+
+    def test_runtime_root_uses_explicit_working_directory_outside_repo(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+
+            runtime_root = self.config.get_runtime_root(tmp_path)
+
+            self.assertEqual(runtime_root, tmp_path)
+
+    def test_installation_info_matches_current_repo_when_loaded_from_source_tree(self) -> None:
+        installation = self.config.get_installation_info(ROOT)
+
+        self.assertEqual(installation.package_root, ROOT / "src" / "bio_toolkit")
+        self.assertEqual(installation.import_root, ROOT)
+        self.assertEqual(installation.active_repo_root, ROOT)
+        self.assertEqual(installation.runtime_root, ROOT)
+        self.assertEqual(installation.install_mode, "editable")
+        self.assertTrue(installation.active_repo_matches_import)
 
 
 if __name__ == "__main__":

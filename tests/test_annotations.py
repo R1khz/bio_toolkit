@@ -1,11 +1,10 @@
 import sys
-from pathlib import Path
 import unittest
+from pathlib import Path
 
 from Bio.Seq import Seq
 from Bio.SeqFeature import FeatureLocation, SeqFeature
 from Bio.SeqRecord import SeqRecord
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"

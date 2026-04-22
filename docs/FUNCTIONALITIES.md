@@ -12,6 +12,8 @@ Available:
 - cache and output directory management
 - reduced-color mode with `--plain`
 - runtime validation with `doctor`
+- guided workflow entrypoint with `start`
+- install mismatch detection when the active repo and imported package diverge
 
 Examples:
 ```bash
@@ -25,9 +27,12 @@ Examples:
 
 Available:
 - NCBI search against `nucleotide` and `protein`
+- UniProt search for protein records
+- KEGG search for genes, pathways, KO terms, enzymes, and diseases
+- guided `start` flow with provider selection
 - organism filtering and result limits
 - Rich terminal tables for search results
-- interactive TTY picker with `search --pick`
+- interactive TTY picker with `search --pick` and provider-aware follow-up actions
 - fetch by accession in `fasta` or `genbank`
 - cache-aware fetch with optional refresh
 - local save, stdout preview, and cached record inspection
@@ -50,17 +55,24 @@ Available:
 - analyze cached FASTA or GenBank records
 - auto-detect molecule type: DNA, RNA, protein, unknown
 - nucleotide metrics: length, GC, AT, base composition, CpG counts
+- nucleotide quality signals: warnings and ambiguous IUPAC base counts
 - protein metrics: length, amino-acid composition, molecular weight, pI, instability, gravy, aromaticity
+- heuristic protein domain detection
+- UniProt domain and AlphaFold enrichment when a UniProt accession is available
 - nucleotide motif review: restriction sites and Kozak matches
+- repeatable `--motif` search for literal motifs or `re:<regex>` patterns
 - ORF scanning across six reading frames
-- JSON export for analysis reports
+- longest ORF translation and top codon usage summary
+- JSON or CSV export for analysis reports
 
 Examples:
 ```bash
 ./bio-toolkit analyze sample.fasta
 ./bio-toolkit analyze sample.gb
 ./bio-toolkit analyze YDX66035 --source cache --database protein --rettype fasta
+./bio-toolkit analyze sample.fasta --motif GAATTC --motif 're:GCCACCATG'
 ./bio-toolkit analyze NG_005905 --source cache --database nucleotide --rettype fasta --output outputs/NG_005905.analysis.json
+./bio-toolkit analyze NG_005905 --source cache --database nucleotide --rettype fasta --output outputs/NG_005905.analysis.csv --export-format csv
 ```
 
 ### Annotation And Rich Exports
@@ -91,7 +103,7 @@ Available:
 - batch fetch from accession lists
 - per-item error isolation with optional `--fail-fast`
 - terminal batch summary tables
-- JSON export for batch reports
+- JSON or CSV export for batch reports
 
 Examples:
 ```bash
@@ -99,6 +111,7 @@ Examples:
 ./bio-toolkit batch inputs/accessions.txt --mode analyze --input-kind accessions --database protein --rettype fasta
 ./bio-toolkit batch inputs/accessions.txt --mode fetch --input-kind accessions --database nucleotide
 ./bio-toolkit batch inputs/accessions.txt --mode analyze --input-kind accessions --database protein --rettype fasta --output outputs/batch.json
+./bio-toolkit batch inputs/files.txt --mode analyze --input-kind files --output outputs/batch.csv --export-format csv
 ```
 
 ### Comparison
@@ -158,11 +171,11 @@ Examples:
 ## Planned Next
 
 - repository publishing and release polish
-- future-ready local BLAST+ contract for Linux servers
+- MySQL-backed persistence for saved runs and summaries
+- a small API surface on top of the existing analysis core
 
 ## Future
 
-- local BLAST+ integration on Linux servers
 - Snakemake integration
 - FASTQ quality-oriented workflows
 - compact text-only mode if real server/log usage demands it
