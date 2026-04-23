@@ -108,6 +108,56 @@ def fetch_kegg_sequence(
     ) from last_error
 
 
+def fetch_kegg_entry(
+    accession: str,
+    *,
+    timeout_seconds: float = 20.0,
+) -> str:
+    clean_accession = accession.strip()
+    if not clean_accession:
+        raise ValueError("KEGG accession cannot be empty.")
+
+    return _request_text(
+        f"{KEGG_API_BASE_URL}/get/{quote(clean_accession)}",
+        timeout_seconds=timeout_seconds,
+    )
+
+
+def summarize_kegg_entry(accession: str, payload: str) -> dict[str, object]:
+    fields = _parse_kegg_fields(payload)
+    pathways = _named_entry_rows(fields.get("PATHWAY", []))
+    diseases = _named_entry_rows(fields.get("DISEASE", []))
+    dblinks = _database_links(fields.get("DBLINKS", []))
+    motifs = _flat_values(fields.get("MOTIF", []))
+    orthology = _named_entry_rows(fields.get("ORTHOLOGY", []))
+    brite = _flat_values(fields.get("BRITE", []))
+    network = _named_entry_rows(fields.get("NETWORK", []))
+    aa_sequence = _sequence_block(fields.get("AASEQ", []))
+    nt_sequence = _sequence_block(fields.get("NTSEQ", []))
+
+    return {
+        "accession": accession,
+        "entry": _entry_token(fields.get("ENTRY", []), accession),
+        "name": _first_value(fields.get("NAME", []), accession),
+        "definition": _first_value(fields.get("DEFINITION", []), ""),
+        "organism": _organism_from_fields(fields),
+        "position": _first_value(fields.get("POSITION", []), ""),
+        "pathways": pathways,
+        "diseases": diseases,
+        "orthology": orthology,
+        "network": network,
+        "brite": brite[:12],
+        "motifs": motifs[:12],
+        "database_links": dblinks,
+        "aa_sequence_length": aa_sequence["length"],
+        "aa_sequence_preview": aa_sequence["preview"],
+        "nt_sequence_length": nt_sequence["length"],
+        "nt_sequence_preview": nt_sequence["preview"],
+        "has_amino_acid_sequence": aa_sequence["length"] is not None,
+        "has_nucleotide_sequence": nt_sequence["length"] is not None,
+    }
+
+
 def normalize_kegg_database(database: str) -> str:
     resolved = database.strip().lower()
     if resolved not in SUPPORTED_KEGG_DATABASES:
@@ -194,3 +244,102 @@ def _request_text(url: str, *, timeout_seconds: float) -> str:
         if "HTTP Error 404" in message:
             raise KeggNotFoundError(f"KEGG resource was not found for {url}.") from exc
         raise KeggError(f"KEGG request failed for {url}: {exc}") from exc
+
+
+def _parse_kegg_fields(payload: str) -> dict[str, list[str]]:
+    fields: dict[str, list[str]] = {}
+    current_key = ""
+    for line in payload.splitlines():
+        key = line[:12].strip()
+        value = line[12:].strip()
+        if key:
+            current_key = key
+            fields.setdefault(key, []).append(value)
+            continue
+        if current_key:
+            fields.setdefault(current_key, []).append(value)
+    return fields
+
+
+def _first_value(values: list[str], default: str) -> str:
+    for value in values:
+        cleaned = value.strip()
+        if cleaned:
+            return cleaned
+    return default
+
+
+def _entry_token(values: list[str], default: str) -> str:
+    value = _first_value(values, default)
+    return value.split()[0] if value else default
+
+
+def _named_entry_rows(values: list[str]) -> list[dict[str, str]]:
+    rows = []
+    for value in values:
+        cleaned = value.strip()
+        if not cleaned:
+            continue
+        if " " in cleaned:
+            identifier, text = cleaned.split(None, 1)
+        else:
+            identifier, text = cleaned, ""
+        rows.append({"id": identifier.strip(), "text": text.strip()})
+    return rows[:20]
+
+
+def _database_links(values: list[str]) -> list[dict[str, str]]:
+    rows = []
+    for value in values:
+        cleaned = value.strip()
+        if not cleaned:
+            continue
+        if ":" in cleaned:
+            database, identifiers = cleaned.split(":", maxsplit=1)
+        else:
+            database, identifiers = cleaned, ""
+        rows.append(
+            {
+                "database": database.strip(),
+                "ids": identifiers.strip(),
+            }
+        )
+    return rows[:20]
+
+
+def _flat_values(values: list[str]) -> list[str]:
+    return [value.strip() for value in values if value.strip()]
+
+
+def _organism_from_fields(fields: dict[str, list[str]]) -> str:
+    organism_values = fields.get("ORGANISM", [])
+    if not organism_values:
+        return ""
+    first_value = organism_values[0].strip()
+    if " " in first_value:
+        _, description = first_value.split(None, 1)
+        return description.strip()
+    return first_value
+
+
+def _sequence_block(values: list[str]) -> dict[str, int | str | None]:
+    if not values:
+        return {"length": None, "preview": ""}
+
+    length = None
+    sequence_parts = []
+    for index, value in enumerate(values):
+        cleaned = value.replace(" ", "").strip()
+        if not cleaned:
+            continue
+        if index == 0 and cleaned.isdigit():
+            length = int(cleaned)
+            continue
+        sequence_parts.append(cleaned)
+
+    sequence = "".join(sequence_parts)
+    if length is None and sequence:
+        length = len(sequence)
+
+    preview = sequence[:80] + ("..." if len(sequence) > 80 else "") if sequence else ""
+    return {"length": length, "preview": preview}

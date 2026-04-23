@@ -168,6 +168,8 @@ class NcbiClient:
 
         if not content.strip():
             raise NcbiError("NCBI returned an empty record.")
+        if content.lstrip().startswith("Error:"):
+            raise NcbiError(content.strip())
 
         return FetchResult(
             accession=accession.strip(),

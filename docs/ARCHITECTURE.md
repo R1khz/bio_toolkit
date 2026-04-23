@@ -14,6 +14,7 @@ Planned commands:
 
 - `start`: guided provider-aware search and action flow
 - `search`: search NCBI
+- `query`: inspect provider APIs directly
 - `fetch`: download a record into local cache
 - `analyze`: analyze a local or cached sequence
 - `annotate`: inspect richer metadata and selected features

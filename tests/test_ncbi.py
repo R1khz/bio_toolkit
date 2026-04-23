@@ -87,6 +87,14 @@ class FakeBlastNcbiClient(NcbiClient):
         return "queryA,P68871.2,100.000,147,0,0,1,147,1,147,5.82e-106,301,100.00\n"
 
 
+class ErrorFetchNcbiClient(NcbiClient):
+    def __init__(self) -> None:
+        super().__init__(email="tester@example.com")
+
+    def _request_text(self, endpoint: str, params: dict[str, str]) -> str:
+        return "Error: Failed to understand id: BRCA1"
+
+
 class NcbiTests(unittest.TestCase):
     def test_build_search_term_adds_organism_filter(self) -> None:
         self.assertEqual(
@@ -127,6 +135,16 @@ class NcbiTests(unittest.TestCase):
             self.assertEqual(
                 default_fetch_path(output_dir, "NM_000001.1", "gb"),
                 output_dir / "NM_000001.1.gb",
+            )
+
+    def test_fetch_raises_for_error_payload(self) -> None:
+        client = ErrorFetchNcbiClient()
+
+        with self.assertRaisesRegex(Exception, "Failed to understand id"):
+            client.fetch(
+                database="nucleotide",
+                accession="BRCA1",
+                rettype="fasta",
             )
 
     def test_blast_submit_parses_rid_and_rtoe(self) -> None:

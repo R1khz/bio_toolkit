@@ -45,6 +45,7 @@ def pick_post_search_action(result: SearchResult) -> str:
         choices = [
             questionary.Choice("Fetch and save", value="fetch"),
             questionary.Choice("Analyze now", value="analyze"),
+            questionary.Choice("Query API details", value="query_details"),
             questionary.Choice("BLAST now", value="blast"),
             questionary.Choice("Show AlphaFold model", value="alphafold"),
             questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
@@ -56,6 +57,7 @@ def pick_post_search_action(result: SearchResult) -> str:
         choices = [
             questionary.Choice("Fetch and save", value="fetch"),
             questionary.Choice("Analyze now", value="analyze"),
+            questionary.Choice("Query API details", value="query_details"),
             questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
             questionary.Choice("Print accession only", value="print_accession"),
             questionary.Separator(),
@@ -65,6 +67,7 @@ def pick_post_search_action(result: SearchResult) -> str:
         choices = [
             questionary.Choice("Fetch and save", value="fetch"),
             questionary.Choice("Analyze now", value="analyze"),
+            questionary.Choice("Query API details", value="query_details"),
             questionary.Choice("Annotate now", value="annotate"),
             questionary.Choice("BLAST now", value="blast"),
             questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
@@ -95,26 +98,52 @@ def prompt_guided_search() -> dict[str, str | int]:
     questionary = _load_questionary()
     _ensure_tty()
 
-    query = questionary.text("What do you want to search for?").ask()
-    if query is None or not str(query).strip():
-        raise InteractivePickerCancelled("Guided search cancelled.")
-
-    provider = questionary.select(
-        "Where do you want to search?",
+    mode = questionary.select(
+        "What do you want to do?",
         choices=[
-            questionary.Choice("Auto", value="auto"),
-            questionary.Choice("NCBI", value="ncbi"),
-            questionary.Choice("UniProt", value="uniprot"),
-            questionary.Choice("KEGG", value="kegg"),
+            questionary.Choice("Search records", value="search"),
+            questionary.Choice("Query API details", value="query"),
             questionary.Separator(),
             questionary.Choice("Cancel", value=None),
         ],
         instruction="Use arrows to move, Enter to confirm",
         use_indicator=True,
     ).ask()
+    if mode is None:
+        raise InteractivePickerCancelled("Guided search cancelled.")
+
+    query = questionary.text("What do you want to search for?").ask()
+    if query is None or not str(query).strip():
+        raise InteractivePickerCancelled("Guided search cancelled.")
+
+    provider_choices = [
+        questionary.Choice("Auto", value="auto"),
+        questionary.Choice("NCBI", value="ncbi"),
+        questionary.Choice("UniProt", value="uniprot"),
+        questionary.Choice("KEGG", value="kegg"),
+    ]
+    if str(mode) == "query":
+        provider_choices.append(questionary.Choice("AlphaFold", value="alphafold"))
+    provider_choices.extend(
+        [
+            questionary.Separator(),
+            questionary.Choice("Cancel", value=None),
+        ]
+    )
+    provider = questionary.select(
+        (
+            "Where do you want to search?"
+            if str(mode) == "search"
+            else "Which API do you want to query?"
+        ),
+        choices=provider_choices,
+        instruction="Use arrows to move, Enter to confirm",
+        use_indicator=True,
+    ).ask()
     if provider is None:
         raise InteractivePickerCancelled("Guided search cancelled.")
 
+    limit = 1 if str(provider) == "alphafold" else 10
     if str(provider) == "ncbi":
         database = questionary.select(
             "Which NCBI database?",
@@ -155,22 +184,27 @@ def prompt_guided_search() -> dict[str, str | int]:
         organism = questionary.text("Organism filter (optional)", default="").ask()
         if organism is None:
             raise InteractivePickerCancelled("Guided search cancelled.")
+    elif str(provider) == "alphafold":
+        database = "protein"
+        organism = ""
     else:
         database = "nucleotide"
         organism = questionary.text("Organism filter (optional)", default="").ask()
         if organism is None:
             raise InteractivePickerCancelled("Guided search cancelled.")
 
-    limit_text = questionary.text("How many results?", default="10").ask()
-    if limit_text is None:
-        raise InteractivePickerCancelled("Guided search cancelled.")
+    if str(provider) != "alphafold":
+        limit_text = questionary.text("How many results?", default="10").ask()
+        if limit_text is None:
+            raise InteractivePickerCancelled("Guided search cancelled.")
 
-    try:
-        limit = int(str(limit_text).strip())
-    except ValueError as exc:
-        raise InteractivePickerError("Guided search limit must be a whole number.") from exc
+        try:
+            limit = int(str(limit_text).strip())
+        except ValueError as exc:
+            raise InteractivePickerError("Guided search limit must be a whole number.") from exc
 
     return {
+        "mode": str(mode),
         "query": str(query).strip(),
         "provider": str(provider),
         "database": str(database),

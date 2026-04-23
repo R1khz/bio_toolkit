@@ -69,6 +69,7 @@ class InteractivePickerTests(unittest.TestCase):
 
         self.assertEqual(action, "analyze")
         self.assertIn("Analyze now", choice_titles)
+        self.assertIn("Query API details", choice_titles)
 
     def test_format_search_choice_is_readable(self) -> None:
         result = SearchResult(
@@ -124,6 +125,38 @@ class InteractivePickerTests(unittest.TestCase):
 
         render_fetch.assert_not_called()
         analyze.assert_called_once_with(console=console, record=fetched, min_orf_aa=30)
+
+    def test_interactive_search_flow_can_render_query_details(self) -> None:
+        result = SearchResult(
+            accession="P69905",
+            title="Hemoglobin subunit alpha",
+            organism="Homo sapiens",
+            source_db="uniprotkb",
+            uid="P69905",
+            provider="uniprot",
+            database="protein",
+        )
+        console = Console(record=True)
+        report = {"provider": "uniprot", "kind": "entry", "query": "P69905"}
+
+        with patch("bio_toolkit.cli.pick_search_result", return_value=result):
+            with patch("bio_toolkit.cli.pick_post_search_action", return_value="query_details"):
+                with patch(
+                    "bio_toolkit.cli.build_provider_query_report",
+                    return_value=report,
+                ) as build_report:
+                    with patch(
+                        "bio_toolkit.cli._render_provider_query_report"
+                    ) as render_report:
+                        _run_interactive_search_flow(
+                            console=console,
+                            settings=object(),
+                            database="protein",
+                            results=[result],
+                        )
+
+        build_report.assert_called_once()
+        render_report.assert_called_once_with(console=console, report=report)
 
 
 if __name__ == "__main__":

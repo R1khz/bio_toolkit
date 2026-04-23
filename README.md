@@ -11,6 +11,7 @@ The v1 core workflow and the first expansion milestone are complete and usable.
 Today the toolkit can:
 
 - run a guided `start` flow that asks what to search and what to do next
+- query provider APIs directly for deeper metadata and cross-references
 - search NCBI `nucleotide` and `protein` databases from the terminal
 - search UniProt for protein records
 - search KEGG for genes, pathways, KO terms, enzymes, or diseases
@@ -65,14 +66,16 @@ Examples:
 
 ### `start`
 
-Runs a guided search and action picker.
+Runs a guided search or API-query flow.
 
 Current capabilities:
 
+- choose between record search and direct API query
 - ask what to search
-- ask where to search: `auto`, `ncbi`, `uniprot`, or `kegg`
+- ask where to search: `auto`, `ncbi`, `uniprot`, `kegg`, or `alphafold` when querying APIs
 - auto-detect literal DNA, RNA, or protein sequences and analyze them directly
 - show results in a picker and launch a provider-aware follow-up action
+- render direct provider metadata reports without leaving the guided flow
 
 Examples:
 
@@ -96,7 +99,7 @@ Current capabilities:
 - terminal table output
 - JSON output
 - interactive picker mode in TTY-capable terminals
-- direct follow-up actions after selection: print accession, fetch, analyze, annotate, BLAST, AlphaFold lookup, or fetch and analyze depending on provider
+- direct follow-up actions after selection: print accession, fetch, analyze, query API details, annotate, BLAST, AlphaFold lookup, or fetch and analyze depending on provider
 
 Examples:
 
@@ -108,6 +111,30 @@ Examples:
 ./bio-toolkit search "SpoIIIAA" --database protein --organism "Bacillus subtilis" --pick
 ./bio-toolkit search "BRCA1" --database nucleotide --limit 5
 ./bio-toolkit search "TP53" --database protein --json
+```
+
+### `query`
+
+Queries provider APIs directly for deeper metadata.
+
+Current capabilities:
+
+- query `ncbi`, `uniprot`, `kegg`, `alphafold`, or `auto`
+- resolve direct accessions and identifiers into richer provider entry summaries
+- inspect UniProt functions, domains, keywords, and cross-references
+- inspect KEGG pathways, diseases, orthology, DB links, and sequence previews
+- preview exact NCBI matches with `efetch`
+- include AlphaFold metadata directly or as UniProt enrichment
+- emit terminal summaries or JSON
+
+Examples:
+
+```bash
+./bio-toolkit query P69905 --provider uniprot
+./bio-toolkit query P69905 --provider alphafold
+./bio-toolkit query hsa:10458 --provider kegg
+./bio-toolkit query BRCA1 --provider ncbi --database nucleotide --organism "Homo sapiens"
+./bio-toolkit query P69905 --provider auto --json
 ```
 
 ### `fetch`

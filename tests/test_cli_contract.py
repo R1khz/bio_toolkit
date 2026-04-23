@@ -30,6 +30,7 @@ class CliContractTests(unittest.TestCase):
                 "doctor",
                 "start",
                 "search",
+                "query",
                 "fetch",
                 "batch",
                 "analyze",

@@ -113,6 +113,30 @@ def extract_uniprot_protein_context(entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def summarize_uniprot_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    context = extract_uniprot_protein_context(entry)
+    sequence = entry.get("sequence", {})
+    return {
+        "accession": context["accession"],
+        "entry_id": str(entry.get("uniProtkbId") or "-"),
+        "protein_name": context["protein_name"],
+        "organism": context["organism"],
+        "genes": context["genes"],
+        "keywords": context["keywords"],
+        "domains": context["domains"],
+        "functions": _extract_comment_text(
+            entry,
+            {"FUNCTION", "CATALYTIC ACTIVITY", "PATHWAY"},
+        ),
+        "subcellular_locations": _extract_comment_text(entry, {"SUBCELLULAR LOCATION"}),
+        "cross_references": _extract_cross_references(entry),
+        "sequence_length": _safe_int(sequence.get("length")),
+        "sequence_preview": _sequence_preview(sequence.get("value")),
+        "reviewed": _is_reviewed_entry(entry),
+        "protein_existence": _protein_existence(entry),
+    }
+
+
 def is_uniprot_accession(value: str) -> bool:
     clean_value = value.strip().upper()
     if not clean_value:
@@ -236,3 +260,86 @@ def _safe_int(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _extract_comment_text(
+    entry: dict[str, Any],
+    allowed_types: set[str],
+) -> list[str]:
+    comments = []
+    for comment in entry.get("comments", []):
+        comment_type = str(comment.get("commentType") or "").upper()
+        if comment_type not in allowed_types:
+            continue
+
+        texts = comment.get("texts", [])
+        if texts:
+            for item in texts:
+                value = str(item.get("value") or "").strip()
+                if value:
+                    comments.append(value)
+            continue
+
+        reaction = comment.get("reaction", {})
+        reaction_name = str(reaction.get("name") or "").strip()
+        if reaction_name:
+            comments.append(reaction_name)
+
+        molecules = comment.get("molecule") or []
+        for molecule in molecules if isinstance(molecules, list) else []:
+            value = str(molecule.get("value") or "").strip()
+            if value:
+                comments.append(value)
+
+        locations = comment.get("subcellularLocations", [])
+        for location in locations:
+            location_name = str(location.get("location", {}).get("value") or "").strip()
+            if location_name:
+                comments.append(location_name)
+
+    return comments[:8]
+
+
+def _extract_cross_references(entry: dict[str, Any]) -> list[dict[str, str]]:
+    cross_references = []
+    for item in entry.get("uniProtKBCrossReferences", []):
+        database = str(item.get("database") or "").strip()
+        identifier = str(item.get("id") or "").strip()
+        if not database or not identifier:
+            continue
+
+        properties = []
+        for property_item in item.get("properties", []):
+            key = str(property_item.get("key") or "").strip()
+            value = str(property_item.get("value") or "").strip()
+            if key and value:
+                properties.append(f"{key}: {value}")
+
+        cross_references.append(
+            {
+                "database": database,
+                "id": identifier,
+                "properties": "; ".join(properties),
+            }
+        )
+
+    return cross_references[:20]
+
+
+def _sequence_preview(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return text[:80] + ("..." if len(text) > 80 else "")
+
+
+def _protein_existence(entry: dict[str, Any]) -> str:
+    protein_existence = entry.get("proteinExistence", {})
+    if isinstance(protein_existence, dict):
+        return str(protein_existence.get("value") or "-")
+    return str(protein_existence or "-")
+
+
+def _is_reviewed_entry(entry: dict[str, Any]) -> bool:
+    entry_type = str(entry.get("entryType") or "").strip().lower()
+    return "reviewed" in entry_type or "swiss-prot" in entry_type

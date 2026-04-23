@@ -50,12 +50,14 @@ from bio_toolkit.ncbi import (
     default_fetch_path,
     search_results_to_dict,
 )
+from bio_toolkit.provider_queries import build_provider_query_report
 from bio_toolkit.providers import (
     infer_query_input,
     infer_search_provider,
     normalize_kegg_search_database,
     normalize_search_provider,
     supported_kegg_databases_text,
+    supported_query_providers_text,
 )
 from bio_toolkit.sequence_io import (
     SequenceIOError,
@@ -181,6 +183,7 @@ def main(
     table.add_row("doctor", "Validate local runtime configuration")
     table.add_row("start", "Guided search and action picker")
     table.add_row("search", "Search NCBI records from the terminal")
+    table.add_row("query", "Query provider APIs for deeper metadata")
     table.add_row("fetch", "Download an NCBI record by accession")
     table.add_row("batch", "Process repeated fetch/analyze work from a list")
     table.add_row("analyze", "Analyze a local or cached sequence record")
@@ -264,10 +267,11 @@ def start(ctx: typer.Context) -> None:
     try:
         search_input = prompt_guided_search()
         settings = refresh_settings()
+        mode = str(search_input.get("mode", "search"))
         query = str(search_input["query"])
         query_info = infer_query_input(query)
 
-        if query_info["kind"] == "sequence":
+        if mode == "search" and query_info["kind"] == "sequence":
             report = _build_guided_sequence_report(query_info)
             _render_analysis_report(
                 console=console,
@@ -278,6 +282,19 @@ def start(ctx: typer.Context) -> None:
             return
 
         provider = str(search_input["provider"])
+        if mode == "query":
+            report = build_provider_query_report(
+                settings=settings,
+                provider=provider,
+                query=query,
+                database=str(search_input["database"]),
+                organism=str(search_input["organism"]),
+                limit=int(search_input["limit"]),
+                rettype="fasta",
+            )
+            _render_provider_query_report(console=console, report=report)
+            return
+
         results, provider_label = _search_provider_results(
             settings=settings,
             provider=provider,
@@ -391,6 +408,75 @@ def search(
             database=database,
             results=results,
         )
+
+
+@app.command()
+def query(
+    ctx: typer.Context,
+    target: str = typer.Argument(
+        ...,
+        help="Accession, identifier, or free-text term to inspect through provider APIs.",
+    ),
+    provider: str = typer.Option(
+        "auto",
+        "--provider",
+        "-p",
+        help=f"Query provider: {supported_query_providers_text()}.",
+    ),
+    database: str = typer.Option(
+        "auto",
+        "--database",
+        "-d",
+        help=(
+            "Database hint. For NCBI use nucleotide or protein. "
+            f"For KEGG use one of: {supported_kegg_databases_text()}."
+        ),
+    ),
+    organism: str = typer.Option("", "--organism", "-o", help="Optional organism filter."),
+    limit: int = typer.Option(
+        5,
+        "--limit",
+        "-n",
+        help="Maximum number of search hits to keep for search-style API queries.",
+    ),
+    rettype: str = typer.Option(
+        "fasta",
+        "--rettype",
+        "-r",
+        help="Preview rettype for exact NCBI matches: fasta, gb, or genbank.",
+    ),
+    as_json: bool = typer.Option(False, "--json", help="Emit JSON instead of terminal tables."),
+) -> None:
+    """Query provider APIs directly for structured metadata and deeper context."""
+    console = _console(ctx)
+
+    try:
+        settings = refresh_settings()
+        report = build_provider_query_report(
+            settings=settings,
+            provider=provider,
+            query=target,
+            database=database,
+            organism=organism,
+            limit=limit,
+            rettype=rettype,
+        )
+    except (
+        AlphaFoldError,
+        KeggError,
+        NcbiConfigurationError,
+        NcbiError,
+        UniProtError,
+        ValueError,
+    ) as exc:
+        _fail(console, str(exc))
+        return
+
+    if as_json:
+        console.print_json(json.dumps(report, indent=2))
+        return
+
+    _render_provider_query_report(console=console, report=report)
 
 
 @app.command()
@@ -1771,6 +1857,251 @@ def _render_annotation_report(
         console.print(f"[green]{export_format.upper()} export written to:[/green] {exported_path}")
 
 
+def _render_provider_query_report(*, console: Console, report: dict) -> None:
+    console.print(_provider_query_summary_panel(report))
+
+    provider = str(report.get("provider", "")).lower()
+    if provider == "ncbi":
+        _render_ncbi_query_report(console, report)
+        return
+    if provider == "uniprot":
+        _render_uniprot_query_report(console, report)
+        return
+    if provider == "kegg":
+        _render_kegg_query_report(console, report)
+        return
+    _render_alphafold_query_report(console, report)
+
+
+def _provider_query_summary_panel(report: dict) -> Panel:
+    lines = [
+        f"Provider: {report.get('provider', '-')}",
+        f"Query: {report.get('query', '-')}",
+        f"Mode: {report.get('kind', '-')}",
+    ]
+    database = str(report.get("database") or "").strip()
+    organism = str(report.get("organism") or "").strip()
+    if database:
+        lines.append(f"Database: {database}")
+    if organism:
+        lines.append(f"Organism filter: {organism}")
+    if "result_count" in report:
+        lines.append(f"Results: {report.get('result_count')}")
+    return Panel.fit("\n".join(lines), title="Provider Query")
+
+
+def _render_ncbi_query_report(console: Console, report: dict) -> None:
+    results = report.get("results", [])
+    if results:
+        console.print(
+            _search_results_table(
+                _dict_search_results(results),
+                f"NCBI:{report['database']}",
+            )
+        )
+    else:
+        console.print(Panel.fit("NCBI returned no search results for this query.", title="NCBI"))
+
+    fetch_preview = report.get("fetch_preview")
+    if fetch_preview:
+        title = (
+            f"Exact Match Preview: {fetch_preview['accession']} "
+            f"({fetch_preview['rettype']})"
+        )
+        console.print(Panel(fetch_preview["preview"] or "-", title=title, expand=False))
+
+
+def _render_uniprot_query_report(console: Console, report: dict) -> None:
+    results = report.get("results", [])
+    if results:
+        console.print(_search_results_table(_dict_search_results(results), "UniProt"))
+
+    entry = report.get("entry") or report.get("top_hit_entry")
+    if not entry:
+        if not results:
+            console.print(Panel.fit("UniProt returned no results for this query.", title="UniProt"))
+        return
+
+    console.print(
+        _pairs_table(
+            "UniProt Entry",
+            [
+                ("Accession", entry.get("accession")),
+                ("Entry ID", entry.get("entry_id")),
+                ("Protein", entry.get("protein_name")),
+                ("Organism", entry.get("organism")),
+                ("Length", _human_int(entry.get("sequence_length"))),
+                ("Reviewed", str(entry.get("reviewed")).lower()),
+                ("Protein Existence", entry.get("protein_existence")),
+                ("Genes", ", ".join(entry.get("genes", [])) or "-"),
+                ("Keywords", ", ".join(entry.get("keywords", [])) or "-"),
+            ],
+        )
+    )
+
+    functions = entry.get("functions", [])
+    if functions:
+        console.print(Panel.fit("\n".join(f"- {item}" for item in functions), title="Functions"))
+
+    locations = entry.get("subcellular_locations", [])
+    if locations:
+        console.print(
+            Panel.fit("\n".join(f"- {item}" for item in locations), title="Subcellular Locations")
+        )
+
+    if entry.get("sequence_preview"):
+        console.print(Panel(entry["sequence_preview"], title="Sequence Preview", expand=False))
+
+    domain_table = _protein_domains_table(
+        {"all_domains": entry.get("domains", []), "skipped": False}
+    )
+    if domain_table is not None:
+        console.print(domain_table)
+
+    xref_table = _cross_reference_table(entry.get("cross_references", []))
+    if xref_table is not None:
+        console.print(xref_table)
+
+    alphafold_panel = _alphafold_panel(report.get("alphafold"))
+    if alphafold_panel is not None:
+        console.print(alphafold_panel)
+
+
+def _render_kegg_query_report(console: Console, report: dict) -> None:
+    results = report.get("results", [])
+    if results:
+        console.print(
+            _search_results_table(
+                _dict_search_results(results),
+                f"KEGG:{report['database']}",
+            )
+        )
+
+    entry = report.get("entry") or report.get("top_hit_entry")
+    if not entry:
+        if not results:
+            console.print(Panel.fit("KEGG returned no results for this query.", title="KEGG"))
+        return
+
+    console.print(
+        _pairs_table(
+            "KEGG Entry",
+            [
+                ("Accession", entry.get("accession")),
+                ("Entry", entry.get("entry")),
+                ("Name", entry.get("name")),
+                ("Definition", entry.get("definition")),
+                ("Organism", entry.get("organism")),
+                ("Position", entry.get("position")),
+                ("AA Length", _human_int(entry.get("aa_sequence_length"))),
+                ("NT Length", _human_int(entry.get("nt_sequence_length"))),
+            ],
+        )
+    )
+
+    pathway_table = _id_text_table("KEGG Pathways", entry.get("pathways", []))
+    if pathway_table is not None:
+        console.print(pathway_table)
+
+    disease_table = _id_text_table("KEGG Diseases", entry.get("diseases", []))
+    if disease_table is not None:
+        console.print(disease_table)
+
+    orthology_table = _id_text_table("KEGG Orthology", entry.get("orthology", []))
+    if orthology_table is not None:
+        console.print(orthology_table)
+
+    network_table = _id_text_table("KEGG Networks", entry.get("network", []))
+    if network_table is not None:
+        console.print(network_table)
+
+    db_links_table = _database_links_table(entry.get("database_links", []))
+    if db_links_table is not None:
+        console.print(db_links_table)
+
+    sequence_preview = report.get("sequence_preview")
+    if sequence_preview and sequence_preview.get("preview"):
+        title = f"Sequence Preview ({sequence_preview.get('database', '-')})"
+        console.print(Panel(sequence_preview["preview"], title=title, expand=False))
+
+
+def _render_alphafold_query_report(console: Console, report: dict) -> None:
+    prediction = report.get("prediction")
+    if prediction is None:
+        console.print(
+            Panel.fit(
+                "No AlphaFold model was found for this accession.",
+                title="AlphaFold",
+            )
+        )
+        return
+    panel = _alphafold_panel(prediction)
+    if panel is not None:
+        console.print(panel)
+
+
+def _pairs_table(title: str, pairs: list[tuple[str, object]]) -> Table:
+    table = Table(title=title)
+    table.add_column("Field", style="cyan")
+    table.add_column("Value", style="white")
+    for label, value in pairs:
+        table.add_row(label, str(value if value not in (None, "") else "-"))
+    return table
+
+
+def _cross_reference_table(rows: list[dict]) -> Table | None:
+    if not rows:
+        return None
+
+    table = Table(title="Cross References")
+    table.add_column("Database", style="cyan")
+    table.add_column("ID", style="magenta")
+    table.add_column("Properties", style="white")
+    for row in rows[:10]:
+        table.add_row(
+            str(row.get("database", "-")),
+            str(row.get("id", "-")),
+            str(row.get("properties", "-") or "-"),
+        )
+    return table
+
+
+def _id_text_table(title: str, rows: list[dict]) -> Table | None:
+    if not rows:
+        return None
+
+    table = Table(title=title)
+    table.add_column("ID", style="cyan")
+    table.add_column("Description", style="white")
+    for row in rows[:10]:
+        table.add_row(str(row.get("id", "-")), str(row.get("text", "-") or "-"))
+    return table
+
+
+def _database_links_table(rows: list[dict]) -> Table | None:
+    if not rows:
+        return None
+
+    table = Table(title="Database Links")
+    table.add_column("Database", style="cyan")
+    table.add_column("IDs", style="white")
+    for row in rows[:10]:
+        table.add_row(str(row.get("database", "-")), str(row.get("ids", "-") or "-"))
+    return table
+
+
+def _dict_search_results(rows: list[dict]) -> list:
+    class _Row:
+        def __init__(self, item: dict) -> None:
+            self.accession = str(item.get("accession", "-"))
+            self.organism = str(item.get("organism", "-"))
+            self.source_db = str(item.get("source_db", "-"))
+            self.length = item.get("length")
+            self.title = str(item.get("title", "-"))
+
+    return [_Row(item) for item in rows]
+
+
 def _build_compare_report(
     *,
     settings,
@@ -3022,6 +3353,31 @@ def _run_interactive_search_flow(
 
     if action == "print_accession":
         console.print(selected_result.accession)
+        return
+
+    if action == "query_details":
+        try:
+            report = build_provider_query_report(
+                settings=settings,
+                provider=str(getattr(selected_result, "provider", "auto")),
+                query=selected_result.accession,
+                database=str(getattr(selected_result, "database", "") or database or "auto"),
+                organism=str(getattr(selected_result, "organism", "") or ""),
+                limit=1,
+                rettype="fasta",
+            )
+        except (
+            AlphaFoldError,
+            KeggError,
+            NcbiConfigurationError,
+            NcbiError,
+            UniProtError,
+            ValueError,
+        ) as exc:
+            _fail(console, str(exc))
+            return
+
+        _render_provider_query_report(console=console, report=report)
         return
 
     try:

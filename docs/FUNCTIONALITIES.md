@@ -30,6 +30,7 @@ Available:
 - UniProt search for protein records
 - KEGG search for genes, pathways, KO terms, enzymes, and diseases
 - guided `start` flow with provider selection
+- direct API query mode for NCBI, UniProt, KEGG, and AlphaFold
 - organism filtering and result limits
 - Rich terminal tables for search results
 - interactive TTY picker with `search --pick` and provider-aware follow-up actions
@@ -45,6 +46,24 @@ Examples:
 ./bio-toolkit fetch NG_005905 --database nucleotide --rettype gb --output outputs/NG_005905.gb
 ./bio-toolkit cache
 ./bio-toolkit cache YDX66035 --database protein --rettype fasta
+```
+
+### Provider Query
+
+Available:
+- direct metadata queries against NCBI
+- direct metadata queries against UniProt
+- direct metadata queries against KEGG
+- direct AlphaFold model lookup by UniProt accession
+- API-query mode inside `start`
+- `Query API details` action from the interactive picker
+
+Examples:
+```bash
+./bio-toolkit query P69905 --provider uniprot
+./bio-toolkit query P69905 --provider alphafold
+./bio-toolkit query hsa:10458 --provider kegg
+./bio-toolkit query BRCA1 --provider ncbi --database nucleotide --organism "Homo sapiens"
 ```
 
 ### Analysis

@@ -25,8 +25,9 @@ Examples:
 
 Current behavior:
 
+- asks whether you want record search or direct API query
 - asks what to search and where to search
-- supports `auto`, `ncbi`, `uniprot`, and `kegg`
+- supports `auto`, `ncbi`, `uniprot`, `kegg`, and `alphafold` for API-query mode
 - detects literal DNA, RNA, or protein sequences and analyzes them directly
 - opens the same interactive action picker used by `search --pick`
 
@@ -76,7 +77,29 @@ TTY picker mode:
 - requires a TTY-capable terminal session
 - lets the user move through search results with arrow keys
 - supports direct follow-up actions after selection
-- current actions depend on provider and include: print accession, fetch, analyze, annotate, BLAST, AlphaFold lookup, and fetch then analyze
+- current actions depend on provider and include: print accession, fetch, analyze, query API details, annotate, BLAST, AlphaFold lookup, and fetch then analyze
+
+### `python -m bio_toolkit query`
+
+Query provider APIs directly for structured metadata.
+
+Examples:
+
+```bash
+./bio-toolkit query P69905 --provider uniprot
+./bio-toolkit query P69905 --provider alphafold
+./bio-toolkit query hsa:10458 --provider kegg
+./bio-toolkit query BRCA1 --provider ncbi --database nucleotide --organism "Homo sapiens"
+./bio-toolkit query P69905 --provider auto --json
+```
+
+Current behavior:
+
+- supports `auto`, `ncbi`, `uniprot`, `kegg`, and `alphafold`
+- uses search-style summaries when the query is broad text
+- resolves direct identifiers into richer provider entry reports when possible
+- enriches UniProt entry reports with AlphaFold metadata when available
+- prints Rich tables/panels or emits JSON to stdout
 
 ### `python -m bio_toolkit fetch`
 
