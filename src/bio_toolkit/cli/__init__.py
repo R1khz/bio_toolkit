@@ -32,6 +32,6 @@ class _LegacyCliPackage(ModuleType):
             setattr(_legacy_cli, name, value)
 
 
+# Keep package-level patch targets like `bio_toolkit.cli.search_kegg` mirrored
+# back into the legacy module where existing function globals are resolved.
 sys.modules[__name__].__class__ = _LegacyCliPackage
-
-__all__ = ["app"]

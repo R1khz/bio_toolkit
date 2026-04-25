@@ -3501,8 +3501,3 @@ def _human_size(size_bytes: int | None) -> str:
         size /= 1024
 
     return f"{size_bytes} B"
-
-
-for _command in app.registered_commands:
-    if _command.name is None and _command.callback is not None:
-        _command.name = _command.callback.__name__

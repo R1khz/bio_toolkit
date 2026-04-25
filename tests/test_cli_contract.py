@@ -1,10 +1,11 @@
+from typer.main import get_command
 from typer.testing import CliRunner
 
 from bio_toolkit.cli import app
 
 
 def test_cli_registers_expected_commands() -> None:
-    command_names = {item.name for item in app.registered_commands}
+    command_names = set(get_command(app).commands)
     assert command_names == {
         "doctor",
         "start",

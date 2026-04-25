@@ -27,6 +27,7 @@ class ProjectLayoutTests(unittest.TestCase):
             ROOT / "src" / "bio_toolkit" / "legacy_config.py",
             ROOT / "src" / "bio_toolkit" / "legacy_providers.py",
             ROOT / "src" / "bio_toolkit" / "cli" / "__init__.py",
+            ROOT / "src" / "bio_toolkit" / "cli" / "app.py",
             ROOT / "src" / "bio_toolkit" / "config" / "__init__.py",
             ROOT / "src" / "bio_toolkit" / "providers" / "__init__.py",
             ROOT / "src" / "bio_toolkit" / "exporters.py",

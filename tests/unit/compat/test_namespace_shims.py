@@ -28,3 +28,12 @@ def test_cli_patch_target_restores_legacy_symbol_after_patch() -> None:
 
     assert cli.search_kegg is original
     assert legacy_cli.search_kegg is original
+
+
+def test_cli_star_import_preserves_legacy_exports() -> None:
+    namespace: dict[str, object] = {}
+
+    exec("from bio_toolkit.cli import *", {}, namespace)
+
+    assert namespace["app"] is app
+    assert namespace["search_kegg"] is legacy_cli.search_kegg
