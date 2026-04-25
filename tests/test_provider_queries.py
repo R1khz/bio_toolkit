@@ -37,9 +37,9 @@ class ProviderQueryTests(unittest.TestCase):
             "keywords": [{"name": "Oxygen transport"}],
         }
 
-        with patch("bio_toolkit.provider_queries.fetch_uniprot_entry", return_value=entry):
+        with patch("bio_toolkit.services.query.service.fetch_uniprot_entry", return_value=entry):
             with patch(
-                "bio_toolkit.provider_queries.fetch_alphafold_prediction",
+                "bio_toolkit.services.query.service.fetch_alphafold_prediction",
                 return_value={"model_id": "AF-P69905-F1"},
             ):
                 report = build_provider_query_report(
@@ -64,9 +64,9 @@ class ProviderQueryTests(unittest.TestCase):
             "DBLINKS     UniProt: Q9UQB8\n"
         )
 
-        with patch("bio_toolkit.provider_queries.fetch_kegg_entry", return_value=payload):
+        with patch("bio_toolkit.services.query.service.fetch_kegg_entry", return_value=payload):
             with patch(
-                "bio_toolkit.provider_queries.fetch_kegg_sequence",
+                "bio_toolkit.services.query.service.fetch_kegg_sequence",
                 side_effect=KeggError("no sequence"),
             ):
                 report = build_provider_query_report(
@@ -106,7 +106,7 @@ class ProviderQueryTests(unittest.TestCase):
         )
 
         with patch(
-            "bio_toolkit.provider_queries.NcbiClient.from_settings",
+            "bio_toolkit.services.query.service.NcbiClient.from_settings",
             return_value=fake_client,
         ):
             report = build_provider_query_report(
@@ -122,7 +122,7 @@ class ProviderQueryTests(unittest.TestCase):
 
     def test_build_alphafold_report(self) -> None:
         with patch(
-            "bio_toolkit.provider_queries.fetch_alphafold_prediction",
+            "bio_toolkit.services.query.service.fetch_alphafold_prediction",
             return_value={"model_id": "AF-P69905-F1", "accession": "P69905"},
         ):
             report = build_provider_query_report(
