@@ -1,7 +1,7 @@
 from bio_toolkit.kegg import (
+    SUPPORTED_KEGG_DATABASES,
     KeggError,
     KeggNotFoundError,
-    SUPPORTED_KEGG_DATABASES,
     fetch_kegg_entry,
     fetch_kegg_sequence,
     is_kegg_identifier,

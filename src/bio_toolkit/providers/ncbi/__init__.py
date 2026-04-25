@@ -1,4 +1,7 @@
 from .client import (
+    SUPPORTED_BLAST_PROGRAMS,
+    SUPPORTED_DATABASES,
+    SUPPORTED_RETTYPES,
     BlastHit,
     BlastSearchInfo,
     BlastSubmission,
@@ -6,9 +9,6 @@ from .client import (
     NcbiClient,
     NcbiConfigurationError,
     NcbiError,
-    SUPPORTED_BLAST_PROGRAMS,
-    SUPPORTED_DATABASES,
-    SUPPORTED_RETTYPES,
     SearchResult,
     blast_hits_to_dict,
     default_fetch_path,

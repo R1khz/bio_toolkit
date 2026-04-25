@@ -10,8 +10,8 @@ from bio_toolkit.providers.errors import ProviderSelectionError
 from bio_toolkit.providers.selection import (
     infer_query_provider,
     infer_search_provider,
-    normalize_search_provider,
     normalize_query_provider,
+    normalize_search_provider,
 )
 
 
