@@ -5,7 +5,12 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - fallback for bare environments
+
+    def load_dotenv(*_args, **_kwargs) -> bool:
+        return False
 
 from .runtime import get_runtime_root
 
