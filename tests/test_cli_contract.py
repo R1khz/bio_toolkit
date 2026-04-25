@@ -1,52 +1,31 @@
-import ast
-import unittest
-from pathlib import Path
+from typer.testing import CliRunner
 
-ROOT = Path(__file__).resolve().parents[1]
-CLI_FILE = ROOT / "src" / "bio_toolkit" / "cli.py"
+from bio_toolkit.cli import app
 
 
-class CliContractTests(unittest.TestCase):
-    def test_cli_registers_expected_commands(self) -> None:
-        module = ast.parse(CLI_FILE.read_text())
-        commands = set()
-
-        for node in module.body:
-            if not isinstance(node, ast.FunctionDef):
-                continue
-
-            for decorator in node.decorator_list:
-                if isinstance(decorator, ast.Call) and isinstance(decorator.func, ast.Attribute):
-                    if (
-                        isinstance(decorator.func.value, ast.Name)
-                        and decorator.func.value.id == "app"
-                    ):
-                        if decorator.func.attr == "command":
-                            commands.add(node.name)
-
-        self.assertEqual(
-            commands,
-            {
-                "doctor",
-                "start",
-                "search",
-                "query",
-                "fetch",
-                "batch",
-                "analyze",
-                "annotate",
-                "compare",
-                "transform",
-                "blast",
-                "cache",
-            },
-        )
-
-    def test_cli_has_plain_option_in_callback(self) -> None:
-        source = CLI_FILE.read_text()
-        self.assertIn("--plain", source)
-        self.assertIn("--pick", source)
+def test_cli_registers_expected_commands() -> None:
+    command_names = {item.name for item in app.registered_commands}
+    assert command_names == {
+        "doctor",
+        "start",
+        "search",
+        "query",
+        "fetch",
+        "batch",
+        "analyze",
+        "annotate",
+        "compare",
+        "transform",
+        "blast",
+        "cache",
+    }
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_cli_help_keeps_plain_and_pick_flags() -> None:
+    runner = CliRunner()
+    root_help = runner.invoke(app, ["--help"])
+    search_help = runner.invoke(app, ["search", "--help"])
+    assert root_help.exit_code == 0
+    assert search_help.exit_code == 0
+    assert "--plain" in root_help.stdout
+    assert "--pick" in search_help.stdout
