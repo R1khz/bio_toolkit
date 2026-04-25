@@ -1,4 +1,4 @@
-from bio_toolkit.legacy_providers import (
+from .selection import (
     DNA_QUERY_CHARS,
     PROTEIN_QUERY_CHARS,
     RNA_QUERY_CHARS,
