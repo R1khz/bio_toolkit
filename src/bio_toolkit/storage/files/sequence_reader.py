@@ -79,7 +79,13 @@ def _requires_text_detection(input_format: str, path: Path | None = None) -> boo
 
 def _read_text_prefix(path: Path, *, prefix_size: int = 4096) -> str:
     with path.open("r", encoding="utf-8") as handle:
-        return handle.read(prefix_size)
+        text = handle.read(prefix_size)
+        while text and text.isspace():
+            chunk = handle.read(prefix_size)
+            if not chunk:
+                break
+            text += chunk
+        return text
 
 
 def _parse_records_from_path(path: Path, resolved_format: str) -> list[SeqRecord]:
