@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from typer.testing import CliRunner
@@ -18,14 +19,20 @@ class QueryCommandTests(unittest.TestCase):
         self.runner = CliRunner()
 
     def test_query_command_emits_json(self) -> None:
-        report = {
-            "provider": "uniprot",
-            "kind": "entry",
-            "query": "P69905",
-            "entry": {"accession": "P69905"},
-        }
+        response = SimpleNamespace(
+            provider="uniprot",
+            kind="entry",
+            query="P69905",
+            result_count=1,
+            model_dump=lambda: {
+                "provider": "uniprot",
+                "kind": "entry",
+                "query": "P69905",
+                "entry": {"accession": "P69905"},
+            },
+        )
 
-        with patch("bio_toolkit.cli.build_provider_query_report", return_value=report):
+        with patch("bio_toolkit.cli.commands.query.run_query", return_value=response):
             result = self.runner.invoke(
                 app,
                 ["query", "P69905", "--provider", "uniprot", "--json"],
@@ -36,16 +43,16 @@ class QueryCommandTests(unittest.TestCase):
         self.assertIn('"accession": "P69905"', result.stdout)
 
     def test_query_command_renders_terminal_report(self) -> None:
-        report = {
-            "provider": "alphafold",
-            "kind": "entry",
-            "query": "P69905",
-            "result_count": 1,
-            "prediction": {"model_id": "AF-P69905-F1"},
-        }
+        response = SimpleNamespace(
+            provider="alphafold",
+            kind="entry",
+            query="P69905",
+            result_count=1,
+            payload=SimpleNamespace(prediction={"model_id": "AF-P69905-F1"}),
+        )
 
-        with patch("bio_toolkit.cli.build_provider_query_report", return_value=report):
-            with patch("bio_toolkit.cli._render_provider_query_report") as render_report:
+        with patch("bio_toolkit.cli.commands.query.run_query", return_value=response):
+            with patch("bio_toolkit.cli.commands.query.render_query_response") as render_report:
                 result = self.runner.invoke(
                     app,
                     ["query", "P69905", "--provider", "alphafold"],
