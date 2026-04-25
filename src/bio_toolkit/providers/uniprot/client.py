@@ -1,6 +1,8 @@
 from bio_toolkit.uniprot import (
     UniProtError,
+    extract_uniprot_protein_context,
     fetch_uniprot_entry,
+    fetch_uniprot_fasta,
     is_uniprot_accession,
     search_uniprot,
     summarize_uniprot_entry,
@@ -8,7 +10,9 @@ from bio_toolkit.uniprot import (
 
 __all__ = [
     "UniProtError",
+    "extract_uniprot_protein_context",
     "fetch_uniprot_entry",
+    "fetch_uniprot_fasta",
     "is_uniprot_accession",
     "search_uniprot",
     "summarize_uniprot_entry",

@@ -5,6 +5,8 @@ import re
 from bio_toolkit.kegg import SUPPORTED_KEGG_DATABASES, is_kegg_identifier, normalize_kegg_database
 from bio_toolkit.uniprot import is_uniprot_accession
 
+from .errors import ProviderSelectionError
+
 SUPPORTED_SEARCH_PROVIDERS = {"auto", "ncbi", "uniprot", "kegg"}
 SUPPORTED_QUERY_PROVIDERS = SUPPORTED_SEARCH_PROVIDERS | {"alphafold"}
 
@@ -17,7 +19,9 @@ def normalize_search_provider(provider: str) -> str:
     resolved = provider.strip().lower()
     if resolved not in SUPPORTED_SEARCH_PROVIDERS:
         allowed = ", ".join(sorted(SUPPORTED_SEARCH_PROVIDERS))
-        raise ValueError(f"Unsupported search provider '{provider}'. Use one of: {allowed}.")
+        raise ProviderSelectionError(
+            f"Unsupported search provider '{provider}'. Use one of: {allowed}."
+        )
     return resolved
 
 
@@ -25,7 +29,9 @@ def normalize_query_provider(provider: str) -> str:
     resolved = provider.strip().lower()
     if resolved not in SUPPORTED_QUERY_PROVIDERS:
         allowed = ", ".join(sorted(SUPPORTED_QUERY_PROVIDERS))
-        raise ValueError(f"Unsupported query provider '{provider}'. Use one of: {allowed}.")
+        raise ProviderSelectionError(
+            f"Unsupported query provider '{provider}'. Use one of: {allowed}."
+        )
     return resolved
 
 

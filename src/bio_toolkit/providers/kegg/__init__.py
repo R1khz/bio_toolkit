@@ -1,5 +1,6 @@
 from .client import (
     KeggError,
+    KeggNotFoundError,
     SUPPORTED_KEGG_DATABASES,
     fetch_kegg_entry,
     fetch_kegg_sequence,
@@ -11,6 +12,7 @@ from .client import (
 
 __all__ = [
     "KeggError",
+    "KeggNotFoundError",
     "SUPPORTED_KEGG_DATABASES",
     "fetch_kegg_entry",
     "fetch_kegg_sequence",

@@ -1,3 +1,4 @@
+from .errors import ProviderSelectionError
 from .selection import (
     DNA_QUERY_CHARS,
     PROTEIN_QUERY_CHARS,
@@ -17,6 +18,7 @@ from .selection import (
 __all__ = [
     "DNA_QUERY_CHARS",
     "PROTEIN_QUERY_CHARS",
+    "ProviderSelectionError",
     "RNA_QUERY_CHARS",
     "SUPPORTED_QUERY_PROVIDERS",
     "SUPPORTED_SEARCH_PROVIDERS",
