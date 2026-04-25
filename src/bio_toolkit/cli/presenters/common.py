@@ -56,3 +56,27 @@ def write_text_export(
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(content, encoding="utf-8")
     return destination
+
+
+def source_label(source_info: dict) -> str:
+    label = str(source_info.get("label", "-"))
+    kind = str(source_info.get("kind", "")).lower()
+    if kind == "file":
+        return Path(label).name
+    return label
+
+
+def transform_output_label(source_info: dict) -> str:
+    label = str(source_info.get("label", "transformed"))
+    kind = str(source_info.get("kind", "")).lower()
+    if kind == "file":
+        return Path(label).stem
+    return label
+
+
+def annotation_output_label(source_info: dict) -> str:
+    label = str(source_info.get("label", "annotation"))
+    kind = str(source_info.get("kind", "")).lower()
+    if kind == "file":
+        return Path(label).stem
+    return label

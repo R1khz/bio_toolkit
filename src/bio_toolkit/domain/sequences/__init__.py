@@ -1,4 +1,4 @@
-from bio_toolkit.domain.sequences.transforms import (
+from .transforms import (
     TransformError,
     default_transform_path,
     normalize_transform_name,
