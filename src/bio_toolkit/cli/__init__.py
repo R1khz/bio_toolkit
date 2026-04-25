@@ -3,7 +3,7 @@ from types import ModuleType
 
 from bio_toolkit import legacy_cli as _legacy_cli
 
-from .app import app
+from .app import app as app
 
 _PACKAGE_INTERNAL_NAMES = {
     "ModuleType",

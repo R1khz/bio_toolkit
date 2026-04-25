@@ -1,4 +1,4 @@
-import importlib.util
+import importlib
 import os
 import sys
 import tempfile
@@ -6,16 +6,13 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG_FILE = ROOT / "src" / "bio_toolkit" / "config.py"
+SRC_DIR = ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 
 def _load_config_module():
-    spec = importlib.util.spec_from_file_location("bio_toolkit_config", CONFIG_FILE)
-    module = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    return importlib.import_module("bio_toolkit.config")
 
 
 class ConfigTests(unittest.TestCase):
