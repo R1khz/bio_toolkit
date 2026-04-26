@@ -69,7 +69,7 @@ class SequenceAnalyzer:
 
     def analyze_record(self, record: SeqRecord) -> dict[str, Any]:
         molecule_type = detect_molecule_type(record)
-        basic_stats = self._basic_stats(record, molecule_type)
+        basic_stats, calculation_warnings = self._basic_stats(record, molecule_type)
         custom_motif_hits = self._custom_motif_analysis(record)
         result = {
             "sequence_id": record.id,
@@ -122,11 +122,16 @@ class SequenceAnalyzer:
             motifs=result["analysis"]["motifs"],
             orfs=result["analysis"]["orfs"],
             min_orf_aa=self.min_orf_aa,
+            initial_warnings=calculation_warnings,
         )
 
         return result
 
-    def _basic_stats(self, record: SeqRecord, molecule_type: str) -> dict[str, Any]:
+    def _basic_stats(
+        self,
+        record: SeqRecord,
+        molecule_type: str,
+    ) -> tuple[dict[str, Any], list[str]]:
         if molecule_type == "PROTEIN":
             return _analyze_protein(record)
         return _analyze_nucleotide(record)
@@ -271,7 +276,7 @@ def detect_molecule_type(record: SeqRecord) -> str:
     return "UNKNOWN"
 
 
-def _analyze_nucleotide(record: SeqRecord) -> dict[str, Any]:
+def _analyze_nucleotide(record: SeqRecord) -> tuple[dict[str, Any], list[str]]:
     sequence = str(record.seq).upper()
     length = len(sequence)
     composition = {base: sequence.count(base) for base in "ATCGU"}
@@ -296,23 +301,26 @@ def _analyze_nucleotide(record: SeqRecord) -> dict[str, Any]:
         if informative_length
         else 0.0,
     }
+    warnings: list[str] = []
 
     if length <= 10_000 and "N" not in sequence and set(sequence) <= set("ATCG"):
         try:
             result["melting_temp_tm"] = round(float(Tm_Wallace(record.seq)), 2)
-        except Exception:
+        except (TypeError, ValueError, ZeroDivisionError) as exc:
             result["melting_temp_tm"] = None
+            warnings.append(_calculation_warning("Melting temperature", exc))
 
-    return result
+    return result, warnings
 
 
-def _analyze_protein(record: SeqRecord) -> dict[str, Any]:
+def _analyze_protein(record: SeqRecord) -> tuple[dict[str, Any], list[str]]:
     sequence = str(record.seq).upper().replace("*", "")
     clean_sequence = _clean_protein_sequence(sequence)
     result: dict[str, Any] = {
         "length": len(sequence),
         "amino_acid_count": _amino_acid_composition(sequence),
     }
+    warnings: list[str] = []
 
     if clean_sequence:
         try:
@@ -324,10 +332,17 @@ def _analyze_protein(record: SeqRecord) -> dict[str, Any]:
             result["gravy"] = round(analysis.gravy(), 4)
             result["aromaticity"] = round(analysis.aromaticity(), 4)
             result["is_stable"] = instability < 40
-        except Exception:
-            pass
+        except (TypeError, ValueError, ZeroDivisionError) as exc:
+            warnings.append(_calculation_warning("Protein physicochemical metrics", exc))
 
-    return result
+    return result, warnings
+
+
+def _calculation_warning(label: str, exc: Exception) -> str:
+    detail = str(exc).strip().rstrip(".")
+    if detail:
+        return f"{label} could not be computed: {detail}."
+    return f"{label} could not be computed due to {exc.__class__.__name__}."
 
 
 def _feature_domains(features: list[SeqFeature]) -> list[dict[str, Any]]:

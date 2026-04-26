@@ -11,8 +11,9 @@ def build_analysis_warnings(
     motifs: dict[str, Any],
     orfs: dict[str, Any],
     min_orf_aa: int,
+    initial_warnings: list[str] | None = None,
 ) -> list[str]:
-    warnings = []
+    warnings = list(initial_warnings or [])
     raw_sequence = sequence.upper()
     length = int(basic_stats.get("length", 0) or 0)
 

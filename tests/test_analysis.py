@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -91,6 +92,42 @@ class AnalysisTests(unittest.TestCase):
 
         self.assertEqual(result["molecule_type"], "PROTEIN")
         self.assertIn("domains", result["analysis"])
+
+    def test_reports_nucleotide_metric_calculation_failures(self) -> None:
+        record = SeqRecord(Seq("ATGCATGCATGC"), id="dna2", description="DNA metric failure")
+
+        with patch(
+            "bio_toolkit.domain.analysis.sequence_analyzer.Tm_Wallace",
+            side_effect=ValueError("bad thermodynamics"),
+        ):
+            result = SequenceAnalyzer().analyze_record(record)
+
+        joined_warnings = " ".join(result["analysis"]["warnings"]).lower()
+
+        self.assertIn("melting temperature could not be computed", joined_warnings)
+        self.assertIn("bad thermodynamics", joined_warnings)
+        self.assertIsNone(result["analysis"]["basic_stats"]["melting_temp_tm"])
+
+    def test_reports_protein_metric_calculation_failures(self) -> None:
+        record = SeqRecord(
+            Seq("MAAAAAGKTLLLLLLLLLLLLFSSAYSR"),
+            id="prot3",
+            description="Protein metric failure",
+        )
+        fake_analysis = Mock()
+        fake_analysis.instability_index.side_effect = ValueError("protein metrics exploded")
+
+        with patch(
+            "bio_toolkit.domain.analysis.sequence_analyzer.ProteinAnalysis",
+            return_value=fake_analysis,
+        ):
+            result = SequenceAnalyzer().analyze_record(record)
+
+        joined_warnings = " ".join(result["analysis"]["warnings"]).lower()
+
+        self.assertIn("protein physicochemical metrics could not be computed", joined_warnings)
+        self.assertIn("protein metrics exploded", joined_warnings)
+        self.assertNotIn("molecular_weight", result["analysis"]["basic_stats"])
 
     def test_compares_analyzed_records(self) -> None:
         analyzer = SequenceAnalyzer(min_orf_aa=2)

@@ -2,6 +2,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from Bio import SeqIO
 from Bio.Seq import Seq
@@ -41,6 +42,22 @@ class SequenceIOTests(unittest.TestCase):
             self.assertEqual(resolved_format, "genbank")
             self.assertEqual(len(records), 1)
             self.assertEqual(records[0].id, "gb1")
+
+    def test_loads_fasta_from_unknown_suffix_without_path_read_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "sample.txt"
+            path.write_text(">seq1\nATGCATGC\n", encoding="utf-8")
+
+            with patch.object(
+                Path,
+                "read_text",
+                side_effect=AssertionError("unexpected read_text"),
+            ):
+                records, resolved_format = load_records_from_path(path, input_format="auto")
+
+            self.assertEqual(resolved_format, "fasta")
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0].id, "seq1")
 
     def test_relative_format_helpers(self) -> None:
         self.assertEqual(detect_input_format(input_format="gb", text="LOCUS test"), "genbank")
