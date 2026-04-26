@@ -30,6 +30,12 @@ class _LegacyCliPackage(ModuleType):
         super().__setattr__(name, value)
         if name in _FORWARDED_NAMES:
             setattr(_legacy_cli, name, value)
+        if name in {"_build_ncbi_client", "_wait_for_remote_blast"}:
+            try:
+                from bio_toolkit.services.blast import service as _blast_service
+            except Exception:
+                return
+            setattr(_blast_service, name, value)
 
 
 # Keep package-level patch targets like `bio_toolkit.cli.search_kegg` mirrored

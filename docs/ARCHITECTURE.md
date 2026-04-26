@@ -2,141 +2,99 @@
 
 ## Goal
 
-Build a CLI-first bioinformatics toolkit that works well on Linux terminals and remote servers, while staying modular enough to grow beyond the MVP.
+Keep `bio_toolkit` CLI-first today while separating orchestration, providers, storage, and presentation so the same core can later back an API or web interface.
 
-## Core Modules
+## Package Layout
 
-### CLI Layer
+### `src/bio_toolkit/cli/`
 
-Handles command parsing, user help, terminal formatting, tables, status messages, and error presentation.
+Terminal adapter layer.
 
-Planned commands:
+- `app.py`: Typer composition root
+- `commands/`: translate CLI flags into service requests
+- `presenters/`: Rich tables, panels, previews, and export notices
+- `interactive/`: picker-facing helpers for guided terminal flows
 
-- `start`: guided provider-aware search and action flow
-- `search`: search NCBI
-- `query`: inspect provider APIs directly
-- `fetch`: download a record into local cache
-- `analyze`: analyze a local or cached sequence
-- `annotate`: inspect richer metadata and selected features
-- `compare`: compare records side by side
-- `transform`: produce reusable FASTA transforms
-- `blast`: submit remote BLAST jobs and summarize hits
-- `cache`: inspect or clean local cache
-- `doctor`: validate runtime configuration
+### `src/bio_toolkit/services/`
 
-### Config Layer
+Use-case orchestration layer.
 
-Reads environment variables and resolves runtime paths such as cache and output directories.
+- owns request validation and cross-module coordination
+- talks to providers, storage, and domain code
+- returns transport-neutral response models instead of terminal output
 
-Primary configuration values:
+Current service areas include:
 
-- `NCBI_EMAIL`
-- `NCBI_API_KEY`
-- `NCBI_TOOL_NAME`
-- `BIO_TOOLKIT_CACHE_DIR`
-- `BIO_TOOLKIT_OUTPUT_DIR`
+- `search`, `query`, `fetch`
+- `analyze`, `annotate`, `compare`, `transform`
+- `blast`, `batch`, `cache`, `doctor`, `start`
 
-### Provider Client Layer
+### `src/bio_toolkit/contracts/`
 
-Responsible for talking to upstream sequence or annotation services and translating responses into shared internal models.
+Typed request/response payloads shared across adapters.
 
-Initial responsibilities:
+- stable shapes for CLI today
+- reusable inputs/outputs for a future API
+- strict validation with Pydantic v2
 
-- NCBI search for `nucleotide` and `protein`
-- NCBI fetch of FASTA or GenBank text
-- UniProt protein search and record enrichment
-- KEGG search and sequence retrieval when available
-- AlphaFold metadata lookup for UniProt-linked proteins
-- submit remote BLAST jobs, poll RID status, and parse tabular results
-- respect upstream API etiquette and rate limits
+### `src/bio_toolkit/providers/`
 
-### Cache Layer
+External system adapters.
 
-Stores fetched records locally to avoid repeated manual lookups and repeated API hits.
+- NCBI
+- UniProt
+- KEGG
+- AlphaFold
+- provider selection and normalization rules
 
-Planned approach:
+### `src/bio_toolkit/storage/`
 
-- disk cache for raw record payloads
-- lightweight metadata index for source, accession, query, retrieval date, and format
-- deterministic cache keys so repeated requests reuse stored data
+Persistence and file adapters.
 
-### Parsing Layer
+- `storage/cache/`: local record cache and metadata index
+- `storage/files/`: FASTA/GenBank parsing and serialization
 
-Transforms FASTA or GenBank content into normalized in-memory sequence objects for downstream analysis.
+### `src/bio_toolkit/config/`
 
-Primary parser dependency:
+Runtime discovery and environment-backed settings.
 
-- Biopython
+- runtime root detection
+- installation diagnostics
+- cache/output directory resolution
 
-### Analysis Layer
+### `src/bio_toolkit/domain/`
 
-Runs sequence analysis on local or cached records.
+Pure or mostly pure business logic.
 
-MVP analysis targets:
+- `analysis/`: molecule detection, sequence analysis, comparisons
+- `annotations/`: annotation extraction and report shaping
+- `sequences/`: transforms and related helpers
 
-- sequence length
-- GC content for nucleotides
-- base or amino acid composition
-- simple motif review
-- ORF scanning for nucleotide sequences
-- heuristic protein domain review
-- optional UniProt and AlphaFold enrichment for protein records
+### Compatibility Shims
 
-### Output Layer
-
-Produces both human-readable terminal output and machine-readable files.
-
-Current outputs:
-
-- Rich tables in terminal
-- JSON export
-- CSV/TSV export for BLAST
-- CSV/Markdown/HTML export for annotations
+Flat modules such as `legacy_cli.py`, `legacy_config.py`, `legacy_providers.py`, `analysis.py`, `annotations.py`, `transforms.py`, `cache_store.py`, `sequence_io.py`, and `provider_queries.py` remain as compatibility surfaces while imports migrate to the package layout above.
 
 ## Data Flow
 
 ```text
-user command
-  -> CLI
-  -> config
-  -> provider client or local file reader
-  -> cache
-  -> parser
-  -> analysis
-  -> terminal report or JSON output
+CLI command
+  -> cli.commands.<use_case>
+  -> services.<use_case>
+  -> providers / storage / domain
+  -> contracts.<use_case>
+  -> cli.presenters.<use_case>
 ```
 
-## Architectural Decisions
+## Design Rules
 
-| Decision | Reason |
-|----------|--------|
-| CLI only for v1 | The main use case is Linux terminal and server execution |
-| Typer + Rich | Good balance of usability, structure, and terminal aesthetics |
-| Python package layout under `src/` | Cleaner imports, packaging, and testing |
-| Dedicated provider client layer | Keeps external API handling separate from analysis logic |
-| Cache as first-class concern | The main user value is not searching the same sequence repeatedly |
-| JSON as first export format | Easy integration with notebooks and later pipelines |
-| Remote-first BLAST | Fits laptop and server usage without forcing local database downloads |
+- CLI modules must not own business logic.
+- Service modules must not print to the terminal.
+- Presenter modules must not call provider or storage code directly.
+- New reusable behavior should go into `services/`, `domain/`, `providers/`, or `storage/`, not back into `legacy_cli.py`.
+- Future API code must reuse `services/` and `contracts/`, not duplicate orchestration.
 
-## BLAST Integration Boundary
+## Expansion Path
 
-The current BLAST workflow is intentionally remote-only.
-
-- The CLI owns query loading, terminal waiting feedback, and result rendering.
-- The NCBI client owns submission, status polling, and result parsing.
-- Exporters own file serialization for BLAST outputs.
-
-This keeps the future persistence/API path clean: MySQL-backed saved runs or a small HTTP layer can plug into the same analysis and export layers without rewriting the user-facing command contract.
-
-## Non-Goals For v1
-
-- web frontend
-- distributed services
-- large workflow orchestration
-- heavy alignment or assembly pipelines
-
-## Near-Term Expansion Direction
-
-- keep BLAST remote-only
-- add MySQL-backed persistence for saved analysis runs
-- add a thin API layer on top of the existing CLI/core report contracts
+- keep BLAST remote-first
+- add persistence or job tracking above existing services
+- introduce `src/bio_toolkit/api/` later as another adapter over the same service layer

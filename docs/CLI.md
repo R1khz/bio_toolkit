@@ -1,5 +1,15 @@
 # CLI Contract
 
+## Internal Boundary
+
+The CLI remains the user-facing entrypoint, but implementation is now split internally:
+
+- `cli.commands` parses flags and builds typed service requests
+- `services` performs the actual work
+- `cli.presenters` renders terminal output
+
+This keeps command behavior stable while making the core reusable outside the terminal later.
+
 ## Current Commands
 
 ### `python -m bio_toolkit`

@@ -28,3 +28,12 @@ def test_core_command_help_surfaces_options() -> None:
     assert runner.invoke(app, ["query", "--help"]).exit_code == 0
     assert runner.invoke(app, ["fetch", "--help"]).exit_code == 0
     assert runner.invoke(app, ["analyze", "--help"]).exit_code == 0
+
+
+def test_remaining_command_help_surfaces_options() -> None:
+    runner = CliRunner()
+    assert runner.invoke(app, ["blast", "--help"]).exit_code == 0
+    assert runner.invoke(app, ["batch", "--help"]).exit_code == 0
+    assert runner.invoke(app, ["cache", "--help"]).exit_code == 0
+    assert runner.invoke(app, ["doctor", "--help"]).exit_code == 0
+    assert runner.invoke(app, ["start", "--help"]).exit_code == 0

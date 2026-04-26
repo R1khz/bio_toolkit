@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import typer
 
 from bio_toolkit.config import refresh_settings
@@ -9,6 +7,7 @@ from bio_toolkit.providers import supported_kegg_databases_text
 from bio_toolkit.services.search.request import SearchRequest
 from bio_toolkit.services.search.service import run_search
 
+from ..interactive.search_flow import run_interactive_search_flow
 from ..presenters.search_presenter import render_search_response
 from .common import fail, get_console
 
@@ -70,7 +69,7 @@ def register(app: typer.Typer) -> None:
         render_search_response(console=console, response=response, as_json=as_json, pick=pick)
 
         if pick and response.results:
-            from bio_toolkit import legacy_cli
+            from types import SimpleNamespace
 
             interactive_results = [
                 SimpleNamespace(
@@ -85,7 +84,7 @@ def register(app: typer.Typer) -> None:
                 )
                 for item in response.results
             ]
-            legacy_cli._run_interactive_search_flow(
+            run_interactive_search_flow(
                 console=console,
                 settings=settings,
                 database=database,

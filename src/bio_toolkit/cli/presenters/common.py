@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from bio_toolkit.exporters import normalize_report_export_format
+from bio_toolkit.exporters import (
+    normalize_blast_export_format,
+    normalize_report_export_format,
+)
 
 
 def human_int(value) -> str:
@@ -46,6 +49,16 @@ def resolve_report_export_format(export_format: str, output: Path) -> str:
     return normalize_report_export_format(normalized)
 
 
+def resolve_blast_export_format(export_format: str, output: Path) -> str:
+    normalized = export_format.strip().lower()
+    if normalized == "auto":
+        suffix = output.suffix.lower()
+        if suffix in {".json", ".csv", ".tsv"}:
+            return normalize_blast_export_format(suffix[1:])
+        return "json"
+    return normalize_blast_export_format(normalized)
+
+
 def write_text_export(
     *,
     output: Path | None,
@@ -80,3 +93,17 @@ def annotation_output_label(source_info: dict) -> str:
     if kind == "file":
         return Path(label).stem
     return label
+
+
+def human_size(size_bytes: int | None) -> str:
+    if size_bytes is None:
+        return "-"
+    units = ["B", "KB", "MB", "GB", "TB"]
+    size = float(size_bytes)
+    unit_index = 0
+    while size >= 1024 and unit_index < len(units) - 1:
+        size /= 1024
+        unit_index += 1
+    if unit_index == 0:
+        return f"{int(size)} {units[unit_index]}"
+    return f"{size:.1f} {units[unit_index]}"
