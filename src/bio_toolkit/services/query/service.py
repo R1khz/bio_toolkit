@@ -229,6 +229,11 @@ def _build_kegg_report(
 
 
 def _build_alphafold_report(query: str) -> QueryResponse:
+    if not is_uniprot_accession(query):
+        raise QueryServiceError(
+            f"AlphaFold requires a UniProt accession ID (e.g. P38398, Q9Y6K9), "
+            f"not a search term. Got: {query!r}"
+        )
     prediction = fetch_alphafold_prediction(query)
     return QueryResponse(
         provider="alphafold",

@@ -77,6 +77,11 @@ def _request_json(url: str, *, timeout_seconds: float) -> Any:
         message = str(exc)
         if "HTTP Error 404" in message:
             return None
+        if "HTTP Error 400" in message:
+            raise AlphaFoldError(
+                "AlphaFold rejected the request — the accession may not exist "
+                "in the AlphaFold DB or is not a valid UniProt accession."
+            ) from exc
         raise AlphaFoldError(f"AlphaFold request failed for {url}: {exc}") from exc
 
 
