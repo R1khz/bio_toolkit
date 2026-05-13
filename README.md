@@ -431,6 +431,35 @@ btk --help
 bio-toolkit --help  # long form, same thing
 ```
 
+### Shell Tab Completion
+
+After installing, enable tab completion for your shell once:
+
+```bash
+# bash
+btk --install-completion bash
+
+# zsh
+btk --install-completion zsh
+
+# fish
+btk --install-completion fish
+```
+
+Restart your shell (or `source ~/.bashrc`), then press Tab on any accession argument to see your cached sequences:
+
+```bash
+btk analyze <TAB>          # shows cached accessions
+btk compare <TAB>          # shows cached accessions
+btk blast <TAB>            # shows cached accessions
+btk annotate <TAB>         # shows cached accessions
+btk transform <TAB>        # shows cached accessions
+```
+
+Completion reads directly from your local cache — no network calls, no configuration needed.
+
+---
+
 ### Local Development Setup
 
 ```bash
