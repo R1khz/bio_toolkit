@@ -43,12 +43,12 @@ class InstallationSmokeTests(unittest.TestCase):
             ROOT / "src" / "bio_toolkit" / "__init__.py",
         )
 
-    def test_project_scripts_expose_short_biotool_alias(self) -> None:
+    def test_project_scripts_expose_short_btk_alias(self) -> None:
         pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         scripts = pyproject["project"]["scripts"]
 
         self.assertEqual(scripts["bio-toolkit"], "bio_toolkit.cli:app")
-        self.assertEqual(scripts["biotool"], "bio_toolkit.cli:app")
+        self.assertEqual(scripts["btk"], "bio_toolkit.cli:app")
 
 
 if __name__ == "__main__":
