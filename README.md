@@ -4,6 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/R1khz/bio_toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/R1khz/bio_toolkit/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/R1khz/bio_toolkit/releases)
+[![Coverage](https://img.shields.io/badge/coverage-72%25-yellow.svg)](https://github.com/R1khz/bio_toolkit)
 
 Bio Toolkit is a Linux-first command line toolkit for finding, fetching, caching, and analyzing biological sequences from NCBI, UniProt, KEGG, and local files.
 
