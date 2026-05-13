@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from .common import human_int, metric_value
+from .common import human_int
 
 
 def render_query_response(*, console: Console, response, as_json: bool) -> None:
@@ -91,15 +91,43 @@ def _metadata_table(*, title: str, payload: dict[str, Any]) -> Table:
     return table
 
 
-def _alphafold_panel(prediction: dict[str, Any]) -> Panel:
-    lines = [
-        f"Model ID: {prediction.get('model_id', '-')}",
-        f"Entry: {prediction.get('entry_url', '-')}",
-    ]
-    if prediction.get("avg_plddt") is not None:
-        lines.append(f"Average pLDDT: {metric_value(prediction['avg_plddt'])}")
-    if prediction.get("sequence_start") is not None and prediction.get("sequence_end") is not None:
-        lines.append(
-            f"Sequence range: {prediction['sequence_start']} - {prediction['sequence_end']}"
-        )
-    return Panel.fit("\n".join(lines), title="AlphaFold")
+def _alphafold_panel(prediction: dict[str, Any]) -> Table:
+    table = Table(title="AlphaFold Prediction", show_header=True)
+    table.add_column("Field", style="cyan", no_wrap=True)
+    table.add_column("Value", style="white")
+
+    def row(label: str, key: str, *, fmt: str = "plain") -> None:
+        val = prediction.get(key)
+        if val is None:
+            return
+        if fmt == "bool":
+            rendered = "Yes" if val else "No"
+        elif fmt == "int":
+            rendered = human_int(val)
+        elif fmt == "pct":
+            rendered = f"{val}%"
+        else:
+            rendered = str(val)
+        table.add_row(label, rendered)
+
+    row("Accession", "accession")
+    row("Gene", "gene")
+    row("UniProt ID", "uniprot_id")
+    row("Protein", "description")
+    row("Organism", "organism")
+    row("Entry ID", "entry_id")
+    row("Sequence length", "sequence_length", fmt="int")
+    row("Avg pLDDT", "avg_plddt")
+    row("pLDDT very high (>90)", "plddt_very_high_pct", fmt="pct")
+    row("pLDDT confident (70-90)", "plddt_confident_pct", fmt="pct")
+    row("pLDDT low (50-70)", "plddt_low_pct", fmt="pct")
+    row("pLDDT very low (<50)", "plddt_very_low_pct", fmt="pct")
+    row("Reviewed (Swiss-Prot)", "is_reviewed", fmt="bool")
+    row("Model version", "latest_version")
+    row("Created", "created_date")
+    row("Tool", "tool")
+    row("View entry", "entry_url")
+    row("Download PDB", "pdb_url")
+    row("Download CIF", "cif_url")
+
+    return table
