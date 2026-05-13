@@ -1,8 +1,18 @@
 # Bio Toolkit
 
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/R1khz/bio_toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/R1khz/bio_toolkit/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/R1khz/bio_toolkit/releases)
+
 Bio Toolkit is a Linux-first command line toolkit for finding, fetching, caching, and analyzing biological sequences from NCBI, UniProt, KEGG, and local files.
 
 It is intentionally small, but it is built like a real software project: package metadata, environment configuration, tests, documentation, modular source code, and a clear CLI workflow.
+
+## Demo
+
+<!-- Record with: vhs demo.tape (https://github.com/charmbracelet/vhs) -->
+<!-- Suggested flow: search → fetch → analyze -->
 
 ## Status
 
@@ -404,6 +414,20 @@ In picker mode you can:
 ```
 
 ## Installation
+
+### Install as a Tool (pipx)
+
+If you just want to use the toolkit without modifying it:
+
+```bash
+pipx install git+https://github.com/R1khz/bio_toolkit.git
+```
+
+Then run it from anywhere:
+
+```bash
+bio-toolkit --help
+```
 
 ### Local Development Setup
 
