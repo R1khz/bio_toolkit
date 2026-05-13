@@ -110,6 +110,62 @@ class InteractivePickerTests(unittest.TestCase):
         self.assertIn("Analyze now", choice_titles)
         self.assertIn("Query API details", choice_titles)
 
+    def test_kegg_genes_result_offers_sequence_actions(self) -> None:
+        result = SearchResult(
+            accession="hsa:672",
+            title="BRCA1",
+            organism="hsa",
+            source_db="kegg:genes",
+            uid="hsa:672",
+            provider="kegg",
+            database="genes",
+        )
+        fake_questionary = FakeQuestionary(answer="analyze")
+
+        with patch(
+            "bio_toolkit.interactive_picker._load_questionary",
+            return_value=fake_questionary,
+        ):
+            with patch("bio_toolkit.interactive_picker._ensure_tty"):
+                pick_post_search_action(result)
+
+        choice_titles = [
+            choice.title for choice in fake_questionary.choices if hasattr(choice, "title")
+        ]
+        self.assertIn("Analyze now", choice_titles)
+        self.assertIn("Fetch and save", choice_titles)
+        self.assertIn("BLAST now", choice_titles)
+
+    def test_kegg_non_sequence_result_offers_only_query_and_print(self) -> None:
+        for database in ("pathway", "ko", "enzyme", "disease"):
+            with self.subTest(database=database):
+                result = SearchResult(
+                    accession="map00280",
+                    title="Example entry",
+                    organism="path",
+                    source_db=f"kegg:{database}",
+                    uid="map00280",
+                    provider="kegg",
+                    database=database,
+                )
+                fake_questionary = FakeQuestionary(answer="query_details")
+
+                with patch(
+                    "bio_toolkit.interactive_picker._load_questionary",
+                    return_value=fake_questionary,
+                ):
+                    with patch("bio_toolkit.interactive_picker._ensure_tty"):
+                        action = pick_post_search_action(result)
+
+                choice_titles = [
+                    choice.title for choice in fake_questionary.choices if hasattr(choice, "title")
+                ]
+                self.assertEqual(action, "query_details")
+                self.assertNotIn("Analyze now", choice_titles)
+                self.assertNotIn("Fetch and save", choice_titles)
+                self.assertNotIn("BLAST now", choice_titles)
+                self.assertIn("Query API details", choice_titles)
+
     def test_pick_search_result_cancel_raises_cancelled(self) -> None:
         result = SearchResult(
             accession="NP_123456.1",

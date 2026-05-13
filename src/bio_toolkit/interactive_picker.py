@@ -56,15 +56,25 @@ def pick_post_search_action(result: SearchResult) -> str:
             questionary.Choice("Cancel", value=_CANCEL_SELECTION),
         ]
     elif provider == "kegg":
-        choices = [
-            questionary.Choice("Fetch and save", value="fetch"),
-            questionary.Choice("Analyze now", value="analyze"),
-            questionary.Choice("Query API details", value="query_details"),
-            questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
-            questionary.Choice("Print accession only", value="print_accession"),
-            questionary.Separator(),
-            questionary.Choice("Cancel", value=_CANCEL_SELECTION),
-        ]
+        kegg_database = getattr(result, "database", "genes").strip().lower()
+        if kegg_database == "genes":
+            choices = [
+                questionary.Choice("Fetch and save", value="fetch"),
+                questionary.Choice("Analyze now", value="analyze"),
+                questionary.Choice("Query API details", value="query_details"),
+                questionary.Choice("BLAST now", value="blast"),
+                questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
+                questionary.Choice("Print accession only", value="print_accession"),
+                questionary.Separator(),
+                questionary.Choice("Cancel", value=_CANCEL_SELECTION),
+            ]
+        else:
+            choices = [
+                questionary.Choice("Query API details", value="query_details"),
+                questionary.Choice("Print accession only", value="print_accession"),
+                questionary.Separator(),
+                questionary.Choice("Cancel", value=_CANCEL_SELECTION),
+            ]
     else:
         choices = [
             questionary.Choice("Fetch and save", value="fetch"),
