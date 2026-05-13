@@ -36,7 +36,7 @@ Repository = "https://github.com/R1khz/bio_toolkit"
 
 [project.scripts]
 bio-toolkit = "bio_toolkit.cli:app"
-biotool = "bio_toolkit.cli:app"
+btk = "bio_toolkit.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/bio_toolkit"]

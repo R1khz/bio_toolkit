@@ -427,7 +427,8 @@ pipx install git+https://github.com/R1khz/bio_toolkit.git
 Then run it from anywhere:
 
 ```bash
-bio-toolkit --help
+btk --help
+bio-toolkit --help  # long form, same thing
 ```
 
 ### Local Development Setup
@@ -461,8 +462,10 @@ If you prefer not to type `./`, activate the environment once and use the instal
 ```bash
 source .venv/bin/activate
 python -m bio_toolkit doctor
-bio-toolkit search "SpoIIIAA" --database protein
+btk search "SpoIIIAA" --database protein
 ```
+
+`btk` is the short alias — it maps to the same CLI as `bio-toolkit`.
 
 ## Configuration
 
