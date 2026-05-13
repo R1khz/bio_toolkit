@@ -54,6 +54,10 @@ def render_query_response(*, console: Console, response, as_json: bool) -> None:
     ko_neighborhood = report.get("ko_neighborhood")
     if isinstance(ko_neighborhood, dict):
         _render_ko_neighborhood(console, ko_neighborhood)
+    elif provider == "kegg" and isinstance(report.get("entry"), dict):
+        entry_data = report.get("entry") or {}
+        if entry_data.get("orthology"):
+            _render_ko_neighborhood_unavailable(console, entry_data)
 
     alphafold = report.get("alphafold") or report.get("prediction")
     if isinstance(alphafold, dict):
@@ -238,12 +242,30 @@ def _render_kegg_sequence_preview(console: Console, preview: dict[str, Any]) -> 
 # ── KO Neighborhood ──────────────────────────────────────────────────────────
 
 
+def _render_ko_neighborhood_unavailable(console: Console, entry: dict[str, Any]) -> None:
+    orthology = entry.get("orthology") or []
+    ko_id = orthology[0].get("id", "?") if orthology else "?"
+    pathways = entry.get("pathways") or []
+    if not pathways:
+        reason = "this gene has no KEGG pathway maps (not included in any pathway)"
+    else:
+        reason = "no directed relations found for this gene in its pathway KGMLs"
+    console.rule("[bold]KO Neighborhood[/bold]")
+    console.print(
+        f"[dim]● {ko_id} — neighborhood not available: {reason}.[/dim]"
+    )
+
+
 def _render_ko_neighborhood(console: Console, neighborhood: dict[str, Any]) -> None:
     upstream = neighborhood.get("upstream") or []
     downstream = neighborhood.get("downstream") or []
     queried_ko = neighborhood.get("queried_ko") or "?"
 
     if not upstream and not downstream:
+        _render_ko_neighborhood_unavailable(
+            console,
+            {"orthology": [{"id": queried_ko}], "pathways": ["placeholder"]},
+        )
         return
 
     panels: list[Panel] = []
