@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from rich.columns import Columns
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -49,6 +50,10 @@ def render_query_response(*, console: Console, response, as_json: bool) -> None:
     sequence_preview = report.get("sequence_preview")
     if isinstance(sequence_preview, dict):
         _render_kegg_sequence_preview(console, sequence_preview)
+
+    ko_neighborhood = report.get("ko_neighborhood")
+    if isinstance(ko_neighborhood, dict):
+        _render_ko_neighborhood(console, ko_neighborhood)
 
     alphafold = report.get("alphafold") or report.get("prediction")
     if isinstance(alphafold, dict):
@@ -228,6 +233,63 @@ def _render_kegg_sequence_preview(console: Console, preview: dict[str, Any]) -> 
     if preview.get("preview"):
         table.add_row("Preview", str(preview["preview"]))
     console.print(table)
+
+
+# ── KO Neighborhood ──────────────────────────────────────────────────────────
+
+
+def _render_ko_neighborhood(console: Console, neighborhood: dict[str, Any]) -> None:
+    upstream = neighborhood.get("upstream") or []
+    downstream = neighborhood.get("downstream") or []
+    queried_ko = neighborhood.get("queried_ko") or "?"
+
+    if not upstream and not downstream:
+        return
+
+    panels: list[Panel] = []
+
+    for item in upstream:
+        count = item.get("count", 1)
+        star = " ★" if count >= 2 else ""
+        panels.append(
+            Panel(
+                f"[dim]{item.get('name') or '—'}[/dim]\n[dim]×{count}{star}[/dim]",
+                title=f"[cyan]{item['ko']}[/cyan]",
+                border_style="cyan",
+                padding=(0, 1),
+            )
+        )
+
+    panels.append(
+        Panel(
+            "[yellow]queried[/yellow]",
+            title=f"[bold yellow]● {queried_ko}[/bold yellow]",
+            border_style="bold yellow",
+            padding=(0, 1),
+        )
+    )
+
+    for item in downstream:
+        count = item.get("count", 1)
+        star = " ★" if count >= 2 else ""
+        panels.append(
+            Panel(
+                f"[dim]{item.get('name') or '—'}[/dim]\n[dim]×{count}{star}[/dim]",
+                title=f"[green]{item['ko']}[/green]",
+                border_style="green",
+                padding=(0, 1),
+            )
+        )
+
+    console.rule(
+        "[bold]KO Neighborhood[/bold]  "
+        "[cyan]← upstream[/cyan]  "
+        "[bold yellow]● center[/bold yellow]  "
+        "[green]downstream →[/green]"
+    )
+    console.print(Columns(panels, equal=False, expand=False))
+    if any(item.get("count", 1) >= 2 for item in upstream + downstream):
+        console.print("[dim]★ = appears in 2+ shared pathways[/dim]")
 
 
 # ── AlphaFold ────────────────────────────────────────────────────────────────

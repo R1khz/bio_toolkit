@@ -13,6 +13,7 @@ from bio_toolkit.providers.alphafold.client import AlphaFoldError, fetch_alphafo
 from bio_toolkit.providers.kegg.client import (
     KeggError,
     fetch_kegg_entry,
+    fetch_kegg_ko_neighborhood,
     fetch_kegg_sequence,
     is_kegg_identifier,
     search_kegg,
@@ -188,6 +189,8 @@ def _build_kegg_report(
 
     if is_kegg_identifier(query):
         payload = fetch_kegg_entry(query)
+        entry_summary = summarize_kegg_entry(query, payload)
+        ko_neighborhood = _safe_kegg_ko_neighborhood(query, entry_summary)
         return QueryResponse(
             provider="kegg",
             kind="entry",
@@ -196,8 +199,9 @@ def _build_kegg_report(
             payload=ProviderSearchPayload(
                 database=resolved_database,
                 results=[],
-                entry=summarize_kegg_entry(query, payload),
+                entry=entry_summary,
                 sequence_preview=_safe_kegg_sequence(query),
+                ko_neighborhood=ko_neighborhood,
             ),
         )
 
@@ -289,6 +293,21 @@ def _safe_kegg_sequence(accession: str) -> dict[str, Any] | None:
         "length": len(sequence) or None,
         "preview": sequence[:80] + ("..." if len(sequence) > 80 else ""),
     }
+
+
+def _safe_kegg_ko_neighborhood(
+    gene_accession: str, entry_summary: dict[str, Any]
+) -> dict[str, Any] | None:
+    orthology = entry_summary.get("orthology") or []
+    pathways = entry_summary.get("pathways") or []
+    if not orthology or not pathways:
+        return None
+    queried_ko = orthology[0].get("id") if orthology else None
+    pathway_ids = [p["id"] for p in pathways if p.get("id")]
+    try:
+        return fetch_kegg_ko_neighborhood(gene_accession, pathway_ids, queried_ko)
+    except Exception:
+        return None
 
 
 def _uniprot_top_hit(results: list[Any]) -> Any | None:

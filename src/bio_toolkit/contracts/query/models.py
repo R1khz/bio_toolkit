@@ -24,3 +24,4 @@ class ProviderSearchPayload(ContractModel):
     sequence_preview: dict[str, Any] | None = None
     entry: dict[str, Any] | None = None
     alphafold: dict[str, Any] | None = None
+    ko_neighborhood: dict[str, Any] | None = None

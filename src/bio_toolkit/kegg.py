@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -156,6 +160,135 @@ def summarize_kegg_entry(accession: str, payload: str) -> dict[str, object]:
         "has_amino_acid_sequence": aa_sequence["length"] is not None,
         "has_nucleotide_sequence": nt_sequence["length"] is not None,
     }
+
+
+def fetch_kegg_ko_neighborhood(
+    gene_accession: str,
+    pathway_ids: list[str],
+    queried_ko: str | None = None,
+    *,
+    timeout_seconds: float = 20.0,
+    max_each: int = 10,
+) -> dict[str, Any]:
+    """
+    Returns upstream and downstream KOs for gene_accession across its shared pathways.
+    Fetches KGML for each pathway in parallel, parses directed relations, and
+    batch-converts organism gene IDs to KO IDs.
+    """
+    if not pathway_ids:
+        return {"queried_ko": queried_ko, "upstream": [], "downstream": []}
+
+    upstream_genes: Counter[str] = Counter()
+    downstream_genes: Counter[str] = Counter()
+    gene_display_names: dict[str, str] = {}
+
+    def _process(pathway_id: str) -> tuple[list[str], list[str], dict[str, str]]:
+        try:
+            kgml = _request_text(
+                f"{KEGG_API_BASE_URL}/get/{quote(pathway_id)}/kgml",
+                timeout_seconds=timeout_seconds,
+            )
+            return _parse_kgml_neighbors(gene_accession, kgml)
+        except Exception:
+            return [], [], {}
+
+    with ThreadPoolExecutor(max_workers=min(5, len(pathway_ids))) as executor:
+        futures = {executor.submit(_process, pid): pid for pid in pathway_ids}
+        for future in as_completed(futures):
+            try:
+                up, down, names = future.result()
+                upstream_genes.update(up)
+                downstream_genes.update(down)
+                gene_display_names.update(names)
+            except Exception:
+                pass
+
+    upstream_genes.pop(gene_accession, None)
+    downstream_genes.pop(gene_accession, None)
+
+    all_gene_ids = list((set(upstream_genes) | set(downstream_genes)) - {gene_accession})
+    gene_to_ko = _batch_gene_to_ko(all_gene_ids, timeout_seconds=timeout_seconds)
+
+    def _build(counter: Counter[str]) -> list[dict[str, Any]]:
+        ko_counts: Counter[str] = Counter()
+        ko_names: dict[str, str] = {}
+        for gene, count in counter.items():
+            raw_ko = gene_to_ko.get(gene, "")
+            if not raw_ko:
+                continue
+            ko_id = raw_ko.replace("ko:", "")
+            ko_counts[ko_id] += count
+            if ko_id not in ko_names:
+                ko_names[ko_id] = gene_display_names.get(gene, "")
+        return [
+            {"ko": ko_id, "name": ko_names.get(ko_id, ""), "count": count}
+            for ko_id, count in ko_counts.most_common(max_each)
+        ]
+
+    return {
+        "queried_ko": queried_ko,
+        "upstream": _build(upstream_genes),
+        "downstream": _build(downstream_genes),
+    }
+
+
+def _parse_kgml_neighbors(
+    gene_accession: str,
+    kgml_text: str,
+) -> tuple[list[str], list[str], dict[str, str]]:
+    try:
+        root = ET.fromstring(kgml_text)
+    except ET.ParseError:
+        return [], [], {}
+
+    entries: dict[str, list[str]] = {}
+    display_names: dict[str, str] = {}
+
+    for entry in root.findall("entry"):
+        entry_id = entry.attrib.get("id", "")
+        gene_ids = [g for g in entry.attrib.get("name", "").split() if ":" in g]
+        entries[entry_id] = gene_ids
+        graphics = entry.find("graphics")
+        short_name = ""
+        if graphics is not None:
+            short_name = graphics.attrib.get("name", "").split(",")[0].strip()
+        for gid in gene_ids:
+            display_names.setdefault(gid, short_name)
+
+    target_ids = {eid for eid, genes in entries.items() if gene_accession in genes}
+    if not target_ids:
+        return [], [], display_names
+
+    upstream: list[str] = []
+    downstream: list[str] = []
+    for relation in root.findall("relation"):
+        e1 = relation.attrib.get("entry1", "")
+        e2 = relation.attrib.get("entry2", "")
+        if e2 in target_ids:
+            upstream.extend(entries.get(e1, []))
+        if e1 in target_ids:
+            downstream.extend(entries.get(e2, []))
+
+    return upstream, downstream, display_names
+
+
+def _batch_gene_to_ko(gene_ids: list[str], *, timeout_seconds: float) -> dict[str, str]:
+    if not gene_ids:
+        return {}
+    result: dict[str, str] = {}
+    unique = list(set(gene_ids))
+    for i in range(0, len(unique), 50):
+        chunk = unique[i : i + 50]
+        url = f"{KEGG_API_BASE_URL}/link/ko/{'+'.join(quote(g) for g in chunk)}"
+        try:
+            text = _request_text(url, timeout_seconds=timeout_seconds)
+            for line in text.strip().splitlines():
+                parts = line.split("\t")
+                if len(parts) == 2:
+                    result[parts[0].strip()] = parts[1].strip()
+        except Exception:
+            pass
+    return result
 
 
 def normalize_kegg_database(database: str) -> str:
