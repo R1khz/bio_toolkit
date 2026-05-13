@@ -23,3 +23,7 @@ dist/
 htmlcov/
 outputs/
 tmp/
+.planning/
+.superpowers/
+.codex
+inputs/
