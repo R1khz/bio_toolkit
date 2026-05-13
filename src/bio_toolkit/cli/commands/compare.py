@@ -9,6 +9,7 @@ from bio_toolkit.config import refresh_settings
 from bio_toolkit.services.compare.request import CompareRequest
 from bio_toolkit.services.compare.service import run_compare
 
+from ..completions import complete_cached_accession
 from ..presenters.common import write_text_export
 from ..presenters.compare_presenter import render_compare_response
 from .common import fail, get_console
@@ -23,6 +24,7 @@ COMPARE_OUTPUT_OPTION = typer.Option(
 COMPARE_TARGETS_ARGUMENT = typer.Argument(
     ...,
     help="Two or more local file paths or cached accessions to compare.",
+    autocompletion=complete_cached_accession,
 )
 
 

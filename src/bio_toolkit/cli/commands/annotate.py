@@ -10,6 +10,7 @@ from bio_toolkit.exporters import normalize_export_format, render_annotation_exp
 from bio_toolkit.services.annotate.request import AnnotateRequest
 from bio_toolkit.services.annotate.service import run_annotation
 
+from ..completions import complete_cached_accession
 from ..presenters.annotation_presenter import render_annotation_response
 from ..presenters.common import annotation_output_label, write_text_export
 from .common import fail, get_console
@@ -29,6 +30,7 @@ def register(app: typer.Typer) -> None:
         target: str = typer.Argument(
             ...,
             help="Local sequence file path or cached accession to annotate.",
+            autocompletion=complete_cached_accession,
         ),
         source: str = typer.Option(
             "auto", "--source", "-s", help="Input source: auto, file, or cache."

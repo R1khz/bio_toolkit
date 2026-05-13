@@ -9,6 +9,7 @@ from bio_toolkit.domain.sequences import default_transform_path
 from bio_toolkit.services.transform.request import TransformRequest
 from bio_toolkit.services.transform.service import run_transform
 
+from ..completions import complete_cached_accession
 from ..presenters.common import transform_output_label
 from ..presenters.transform_presenter import render_transform_response
 from .common import fail, get_console
@@ -26,7 +27,9 @@ def register(app: typer.Typer) -> None:
     def transform(
         ctx: typer.Context,
         target: str = typer.Argument(
-            ..., help="Local sequence file path or cached accession to transform."
+            ...,
+            help="Local sequence file path or cached accession to transform.",
+            autocompletion=complete_cached_accession,
         ),
         operation: str = typer.Option(
             "reverse-complement",

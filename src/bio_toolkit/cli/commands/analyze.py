@@ -9,6 +9,7 @@ from bio_toolkit.exporters import render_analysis_export
 from bio_toolkit.services.analyze.request import AnalyzeRequest
 from bio_toolkit.services.analyze.service import run_analysis
 
+from ..completions import complete_cached_accession
 from ..presenters.analysis_presenter import render_analysis_response
 from ..presenters.common import resolve_report_export_format, write_text_export
 from .common import fail, get_console
@@ -36,6 +37,7 @@ def register(app: typer.Typer) -> None:
         target: str = typer.Argument(
             ...,
             help="Local sequence file path or cached accession, depending on --source.",
+            autocompletion=complete_cached_accession,
         ),
         source: str = typer.Option(
             "auto",

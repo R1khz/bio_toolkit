@@ -8,6 +8,7 @@ from bio_toolkit.config import refresh_settings
 from bio_toolkit.exporters import render_blast_export
 from bio_toolkit.services.blast import BlastRequest, run_blast
 
+from ..completions import complete_cached_accession
 from ..presenters.blast_presenter import render_blast_response
 from ..presenters.common import resolve_blast_export_format, write_text_export
 from .common import fail, get_console
@@ -27,6 +28,7 @@ def register(app: typer.Typer) -> None:
         target: str = typer.Argument(
             ...,
             help="Local sequence file path or cached accession to submit as the BLAST query.",
+            autocompletion=complete_cached_accession,
         ),
         source: str = typer.Option(
             "auto", "--source", "-s", help="Input source: auto, file, or cache."
