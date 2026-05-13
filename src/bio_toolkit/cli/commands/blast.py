@@ -21,7 +21,7 @@ BLAST_OUTPUT_OPTION = typer.Option(
 
 
 def register(app: typer.Typer) -> None:
-    @app.command()
+    @app.command(help="Run remote BLAST searches from local or cached queries.")
     def blast(
         ctx: typer.Context,
         target: str = typer.Argument(

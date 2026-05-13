@@ -9,7 +9,7 @@ from .common import fail, get_console
 
 
 def register(app: typer.Typer) -> None:
-    @app.command()
+    @app.command(help="Validate local runtime configuration.")
     def doctor(
         ctx: typer.Context,
         create_dirs: bool = typer.Option(

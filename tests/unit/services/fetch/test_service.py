@@ -41,6 +41,7 @@ def test_fetch_service_prefers_cache_before_remote_fetch() -> None:
     assert response.accession == "NM_000546"
     assert response.cache_hit is True
     assert response.record.content == ">NM_000546\nATGC\n"
+    assert response.record.provider == "ncbi"
 
 
 def test_fetch_service_saves_remote_result_when_cache_misses() -> None:
@@ -70,6 +71,7 @@ def test_fetch_service_saves_remote_result_when_cache_misses() -> None:
         assert response.cache_hit is False
         assert response.cache_path is not None
         assert response.record.source == "ncbi"
+        assert response.record.provider == "ncbi"
         assert CacheStore(Path(tmp_dir)).get_record(
             accession="NM_000546",
             database="nucleotide",

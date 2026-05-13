@@ -26,7 +26,7 @@ BATCH_TARGETS_ARGUMENT = typer.Argument(
 
 
 def register(app: typer.Typer) -> None:
-    @app.command()
+    @app.command(help="Process repeated fetch/analyze work from a list.")
     def batch(
         ctx: typer.Context,
         targets_file: Path = BATCH_TARGETS_ARGUMENT,

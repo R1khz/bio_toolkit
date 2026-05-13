@@ -9,7 +9,6 @@ from bio_toolkit.cli.interactive.picker import (
 )
 from bio_toolkit.config import refresh_settings
 from bio_toolkit.services.analyze.response import AnalyzeResponse
-from bio_toolkit.services.query.response import QueryResponse
 from bio_toolkit.services.search.response import SearchResponse
 from bio_toolkit.services.start import StartRequest, run_start
 
@@ -17,11 +16,11 @@ from ..interactive.search_flow import run_interactive_search_flow
 from ..presenters.analysis_presenter import render_analysis_response
 from ..presenters.query_presenter import render_query_response
 from ..presenters.search_presenter import render_search_response
-from .common import fail, get_console
+from .common import fail, format_cli_error, get_console
 
 
 def register(app: typer.Typer) -> None:
-    @app.command()
+    @app.command(help="Guided search and action picker.")
     def start(ctx: typer.Context) -> None:
         console = get_console(ctx)
         try:
@@ -45,7 +44,7 @@ def register(app: typer.Typer) -> None:
             fail(console, str(exc))
             return
         except Exception as exc:
-            fail(console, str(exc))
+            fail(console, format_cli_error(exc))
             return
 
         if response.kind == "analysis":
@@ -61,7 +60,7 @@ def register(app: typer.Typer) -> None:
         if response.kind == "query":
             render_query_response(
                 console=console,
-                response=QueryResponse.model_validate(response.payload),
+                response=response.payload,
                 as_json=False,
             )
             return
@@ -88,9 +87,12 @@ def register(app: typer.Typer) -> None:
             )
             for item in search_response.results
         ]
-        run_interactive_search_flow(
-            console=console,
-            settings=settings,
-            database=str(search_input["database"]),
-            results=interactive_results,
-        )
+        try:
+            run_interactive_search_flow(
+                console=console,
+                settings=settings,
+                database=str(search_input["database"]),
+                results=interactive_results,
+            )
+        except Exception as exc:
+            fail(console, format_cli_error(exc))

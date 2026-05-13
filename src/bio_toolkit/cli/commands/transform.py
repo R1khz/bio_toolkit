@@ -22,7 +22,7 @@ TRANSFORM_OUTPUT_OPTION = typer.Option(
 
 
 def register(app: typer.Typer) -> None:
-    @app.command()
+    @app.command(help="Transform local or cached sequence records.")
     def transform(
         ctx: typer.Context,
         target: str = typer.Argument(

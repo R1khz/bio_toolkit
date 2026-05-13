@@ -19,7 +19,7 @@ from .commands import (
 from .commands.common import register_root_callback
 
 app = typer.Typer(
-    add_completion=False,
+    add_completion=True,
     help="Linux-first CLI toolkit for NCBI sequence retrieval and analysis.",
     no_args_is_help=False,
 )

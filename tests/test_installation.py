@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -41,6 +42,13 @@ class InstallationSmokeTests(unittest.TestCase):
             Path(result.stdout.strip()),
             ROOT / "src" / "bio_toolkit" / "__init__.py",
         )
+
+    def test_project_scripts_expose_short_biotool_alias(self) -> None:
+        pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+        scripts = pyproject["project"]["scripts"]
+
+        self.assertEqual(scripts["bio-toolkit"], "bio_toolkit.cli:app")
+        self.assertEqual(scripts["biotool"], "bio_toolkit.cli:app")
 
 
 if __name__ == "__main__":

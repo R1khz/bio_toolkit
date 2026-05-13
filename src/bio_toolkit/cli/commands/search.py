@@ -9,7 +9,7 @@ from bio_toolkit.services.search.service import run_search
 
 from ..interactive.search_flow import run_interactive_search_flow
 from ..presenters.search_presenter import render_search_response
-from .common import fail, get_console
+from .common import fail, format_cli_error, get_console
 
 
 def register(app: typer.Typer) -> None:
@@ -63,7 +63,7 @@ def register(app: typer.Typer) -> None:
                 settings=settings,
             )
         except Exception as exc:
-            fail(console, str(exc))
+            fail(console, format_cli_error(exc))
             return
 
         render_search_response(console=console, response=response, as_json=as_json, pick=pick)
@@ -84,9 +84,12 @@ def register(app: typer.Typer) -> None:
                 )
                 for item in response.results
             ]
-            run_interactive_search_flow(
-                console=console,
-                settings=settings,
-                database=database,
-                results=interactive_results,
-            )
+            try:
+                run_interactive_search_flow(
+                    console=console,
+                    settings=settings,
+                    database=database,
+                    results=interactive_results,
+                )
+            except Exception as exc:
+                fail(console, format_cli_error(exc))

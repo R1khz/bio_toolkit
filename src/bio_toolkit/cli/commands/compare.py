@@ -27,7 +27,7 @@ COMPARE_TARGETS_ARGUMENT = typer.Argument(
 
 
 def register(app: typer.Typer) -> None:
-    @app.command()
+    @app.command(help="Compare two or more local or cached records.")
     def compare(
         ctx: typer.Context,
         targets: list[str] = COMPARE_TARGETS_ARGUMENT,

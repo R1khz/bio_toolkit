@@ -8,9 +8,10 @@ SRC_DIR = ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from bio_toolkit.cli import _search_provider_results  # noqa: E402
 from bio_toolkit.ncbi import SearchResult  # noqa: E402
 from bio_toolkit.providers import infer_query_input, infer_search_provider  # noqa: E402
+from bio_toolkit.services.search.request import SearchRequest  # noqa: E402
+from bio_toolkit.services.search.service import run_search  # noqa: E402
 
 
 class ProviderInferenceTests(unittest.TestCase):
@@ -37,18 +38,19 @@ class ProviderInferenceTests(unittest.TestCase):
             )
         ]
 
-        with patch("bio_toolkit.cli.search_kegg", return_value=fake_results) as search_kegg:
-            results, label = _search_provider_results(
-                settings=object(),
-                provider="auto",
-                query="hsa:10458",
-                ncbi_database="nucleotide",
-                organism="",
-                limit=5,
-            )
+        request = SearchRequest(
+            provider="auto",
+            query="hsa:10458",
+            database="nucleotide",
+            organism="",
+            limit=5,
+        )
 
-        self.assertEqual(results, fake_results)
-        self.assertEqual(label, "KEGG:genes")
+        kegg_path = "bio_toolkit.services.search.service.search_kegg"
+        with patch(kegg_path, return_value=fake_results) as search_kegg:
+            response = run_search(request, settings=object())
+
+        self.assertEqual(response.database_label, "KEGG:genes")
         search_kegg.assert_called_once_with(query="hsa:10458", database="genes", limit=5)
 
 

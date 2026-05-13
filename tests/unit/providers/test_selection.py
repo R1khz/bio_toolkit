@@ -1,6 +1,5 @@
 import pytest
 
-import bio_toolkit.legacy_providers as legacy_providers
 import bio_toolkit.providers as providers
 import bio_toolkit.providers.alphafold as alphafold_provider
 import bio_toolkit.providers.kegg as kegg_provider
@@ -52,9 +51,3 @@ def test_provider_adapter_packages_expose_expected_symbols() -> None:
 
     assert alphafold_provider.AlphaFoldError is not None
     assert alphafold_provider.fetch_alphafold_prediction is not None
-
-
-def test_legacy_providers_selection_compatibility_still_works() -> None:
-    assert legacy_providers.infer_query_provider("P69905") == "uniprot"
-    assert legacy_providers.infer_search_provider("BRCA1") == "ncbi"
-    assert legacy_providers.normalize_query_provider("alphafold") == "alphafold"

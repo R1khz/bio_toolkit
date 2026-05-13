@@ -8,6 +8,10 @@ from rich.table import Table
 from bio_toolkit import __version__
 from bio_toolkit.config import get_settings
 
+REMOTE_REQUEST_HINT = (
+    "Check internet/DNS connectivity and the remote provider status, then retry."
+)
+
 
 def get_console(ctx: typer.Context | None = None) -> Console:
     settings = get_settings()
@@ -18,6 +22,18 @@ def get_console(ctx: typer.Context | None = None) -> Console:
 def fail(console: Console, message: str) -> None:
     console.print(f"[red]{message}[/red]")
     raise typer.Exit(code=1)
+
+
+def format_cli_error(exc: Exception) -> str:
+    message = str(exc).strip() or exc.__class__.__name__
+    if _looks_like_remote_request_error(message):
+        return f"{message}\n{REMOTE_REQUEST_HINT}"
+    return message
+
+
+def _looks_like_remote_request_error(message: str) -> bool:
+    lower = message.lower()
+    return "request failed for http" in lower or "<urlopen error" in lower
 
 
 def register_root_callback(app: typer.Typer) -> None:

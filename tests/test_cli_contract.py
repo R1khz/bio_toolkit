@@ -30,3 +30,17 @@ def test_cli_help_keeps_plain_and_pick_flags() -> None:
     assert search_help.exit_code == 0
     assert "--plain" in root_help.stdout
     assert "--pick" in search_help.stdout
+    assert "--install-completion" in root_help.stdout
+    assert "--show-completion" in root_help.stdout
+
+
+def test_root_help_includes_descriptions_for_interactive_and_local_commands() -> None:
+    runner = CliRunner()
+    root_help = runner.invoke(app, ["--help"])
+
+    assert root_help.exit_code == 0
+    assert "Guided search and action picker" in root_help.stdout
+    assert "Validate local runtime configuration" in root_help.stdout
+    assert "Inspect local cache contents" in root_help.stdout
+    assert "Process repeated fetch/analyze work from a list" in root_help.stdout
+    assert "Run remote BLAST searches from local or cached queries" in root_help.stdout

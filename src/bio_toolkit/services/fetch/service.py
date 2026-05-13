@@ -68,5 +68,6 @@ def _to_fetched_record(record: Any) -> FetchedRecord:
         database=str(record.database),
         rettype=str(record.rettype),
         source=str(record.source),
+        provider=str(getattr(record, "provider", "ncbi")),
         content=str(record.content),
     )

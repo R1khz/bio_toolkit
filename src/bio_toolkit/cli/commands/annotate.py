@@ -23,7 +23,7 @@ ANNOTATE_OUTPUT_OPTION = typer.Option(
 
 
 def register(app: typer.Typer) -> None:
-    @app.command()
+    @app.command(help="Inspect record metadata and selected features.")
     def annotate(
         ctx: typer.Context,
         target: str = typer.Argument(

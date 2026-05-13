@@ -9,7 +9,7 @@ from .common import fail, get_console
 
 
 def register(app: typer.Typer) -> None:
-    @app.command()
+    @app.command(help="Inspect local cache contents.")
     def cache(
         ctx: typer.Context,
         accession: str | None = typer.Argument(

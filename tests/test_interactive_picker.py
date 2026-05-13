@@ -3,19 +3,20 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from rich.console import Console
-
 ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from bio_toolkit.cli import _run_interactive_search_flow  # noqa: E402
 from bio_toolkit.interactive_picker import (  # noqa: E402
+    InteractivePickerCancelled,
+    InteractivePickerError,
     format_search_choice,
     pick_post_search_action,
+    pick_search_result,
+    prompt_guided_search,
 )
-from bio_toolkit.ncbi import FetchResult, SearchResult  # noqa: E402
+from bio_toolkit.ncbi import SearchResult  # noqa: E402
 
 
 class FakePrompt:
@@ -30,7 +31,7 @@ class FakeQuestionary:
     class Choice:
         def __init__(self, title: str, value) -> None:
             self.title = title
-            self.value = value
+            self.value = title if value is None else value
 
     class Separator:
         pass
@@ -42,6 +43,44 @@ class FakeQuestionary:
     def select(self, _message: str, *, choices, instruction: str, use_indicator: bool):
         self.choices = choices
         return FakePrompt(self.answer)
+
+
+class GuidedFakeQuestionary:
+    class Choice:
+        def __init__(self, title: str, value) -> None:
+            self.title = title
+            self.value = title if value is None else value
+
+    class Separator:
+        pass
+
+    def __init__(self, *, select_answers: list[str], text_answers: list[str]) -> None:
+        self._select_answers = iter(select_answers)
+        self._text_answers = iter(text_answers)
+        self.text_calls: list[tuple[str, str]] = []
+
+    def select(self, _message: str, *, choices, instruction: str, use_indicator: bool):
+        del choices, instruction, use_indicator
+        return FakePrompt(next(self._select_answers))
+
+    def text(self, message: str, default: str = ""):
+        self.text_calls.append((message, default))
+        return FakePrompt(next(self._text_answers))
+
+
+class CancelChoiceQuestionary:
+    class Choice:
+        def __init__(self, title: str, value) -> None:
+            self.title = title
+            self.value = title if value is None else value
+
+    class Separator:
+        pass
+
+    def select(self, _message: str, *, choices, instruction: str, use_indicator: bool):
+        del instruction, use_indicator
+        choice = next(item for item in reversed(choices) if hasattr(item, "value"))
+        return FakePrompt(choice.value)
 
 
 class InteractivePickerTests(unittest.TestCase):
@@ -71,6 +110,51 @@ class InteractivePickerTests(unittest.TestCase):
         self.assertIn("Analyze now", choice_titles)
         self.assertIn("Query API details", choice_titles)
 
+    def test_pick_search_result_cancel_raises_cancelled(self) -> None:
+        result = SearchResult(
+            accession="NP_123456.1",
+            title="Example sporulation protein",
+            organism="Bacillus subtilis",
+            source_db="refseq",
+            uid="1",
+            length=742,
+        )
+
+        with patch(
+            "bio_toolkit.interactive_picker._load_questionary",
+            return_value=CancelChoiceQuestionary(),
+        ):
+            with patch("bio_toolkit.interactive_picker._ensure_tty"):
+                with self.assertRaises(InteractivePickerCancelled):
+                    pick_search_result([result])
+
+    def test_pick_post_search_action_cancel_raises_cancelled(self) -> None:
+        result = SearchResult(
+            accession="NP_123456.1",
+            title="Example sporulation protein",
+            organism="Bacillus subtilis",
+            source_db="refseq",
+            uid="1",
+            length=742,
+        )
+
+        with patch(
+            "bio_toolkit.interactive_picker._load_questionary",
+            return_value=CancelChoiceQuestionary(),
+        ):
+            with patch("bio_toolkit.interactive_picker._ensure_tty"):
+                with self.assertRaises(InteractivePickerCancelled):
+                    pick_post_search_action(result)
+
+    def test_prompt_guided_search_cancel_raises_cancelled(self) -> None:
+        with patch(
+            "bio_toolkit.interactive_picker._load_questionary",
+            return_value=CancelChoiceQuestionary(),
+        ):
+            with patch("bio_toolkit.interactive_picker._ensure_tty"):
+                with self.assertRaises(InteractivePickerCancelled):
+                    prompt_guided_search()
+
     def test_format_search_choice_is_readable(self) -> None:
         result = SearchResult(
             accession="NP_123456.1",
@@ -88,75 +172,35 @@ class InteractivePickerTests(unittest.TestCase):
         self.assertIn("742", rendered)
         self.assertIn("Example sporulation protein", rendered)
 
-    def test_interactive_search_flow_can_analyze_without_rendering_fetch_preview(self) -> None:
-        result = SearchResult(
-            accession="NP_123456.1",
-            title="Example sporulation protein",
-            organism="Bacillus subtilis",
-            source_db="refseq",
-            uid="1",
-            length=742,
+    def test_prompt_guided_search_uses_blank_limit_prompt_and_defaults_to_ten(self) -> None:
+        fake_questionary = GuidedFakeQuestionary(
+            select_answers=["search", "auto"],
+            text_answers=["BRCA1", "", ""],
         )
-        fetched = FetchResult(
-            accession="NP_123456.1",
-            database="protein",
-            rettype="fasta",
-            content=">NP_123456.1\nMKWVTFISLLLLFSSAYSR\n",
-            file_suffix=".fasta",
-            source="cache",
+
+        with patch(
+            "bio_toolkit.interactive_picker._load_questionary",
+            return_value=fake_questionary,
+        ):
+            with patch("bio_toolkit.interactive_picker._ensure_tty"):
+                result = prompt_guided_search()
+
+        self.assertEqual(result["limit"], 10)
+        self.assertIn(("How many results? [default: 10]", ""), fake_questionary.text_calls)
+
+    def test_prompt_guided_search_rejects_non_numeric_limits(self) -> None:
+        fake_questionary = GuidedFakeQuestionary(
+            select_answers=["search", "auto"],
+            text_answers=["BRCA1", "", "abc"],
         )
-        console = Console(record=True)
 
-        with patch("bio_toolkit.cli.pick_search_result", return_value=result):
-            with patch("bio_toolkit.cli.pick_post_search_action", return_value="analyze"):
-                with patch("bio_toolkit.cli.ensure_runtime_dirs"):
-                    with patch(
-                        "bio_toolkit.cli._resolve_fetch",
-                        return_value=(None, None, fetched),
-                    ):
-                        with patch("bio_toolkit.cli._render_fetch_output") as render_fetch:
-                            with patch("bio_toolkit.cli._analyze_fetched_record") as analyze:
-                                _run_interactive_search_flow(
-                                    console=console,
-                                    settings=object(),
-                                    database="protein",
-                                    results=[result],
-                                )
-
-        render_fetch.assert_not_called()
-        analyze.assert_called_once_with(console=console, record=fetched, min_orf_aa=30)
-
-    def test_interactive_search_flow_can_render_query_details(self) -> None:
-        result = SearchResult(
-            accession="P69905",
-            title="Hemoglobin subunit alpha",
-            organism="Homo sapiens",
-            source_db="uniprotkb",
-            uid="P69905",
-            provider="uniprot",
-            database="protein",
-        )
-        console = Console(record=True)
-        report = {"provider": "uniprot", "kind": "entry", "query": "P69905"}
-
-        with patch("bio_toolkit.cli.pick_search_result", return_value=result):
-            with patch("bio_toolkit.cli.pick_post_search_action", return_value="query_details"):
-                with patch(
-                    "bio_toolkit.cli.build_provider_query_report",
-                    return_value=report,
-                ) as build_report:
-                    with patch(
-                        "bio_toolkit.cli._render_provider_query_report"
-                    ) as render_report:
-                        _run_interactive_search_flow(
-                            console=console,
-                            settings=object(),
-                            database="protein",
-                            results=[result],
-                        )
-
-        build_report.assert_called_once()
-        render_report.assert_called_once_with(console=console, report=report)
+        with patch(
+            "bio_toolkit.interactive_picker._load_questionary",
+            return_value=fake_questionary,
+        ):
+            with patch("bio_toolkit.interactive_picker._ensure_tty"):
+                with self.assertRaises(InteractivePickerError):
+                    prompt_guided_search()
 
 
 if __name__ == "__main__":

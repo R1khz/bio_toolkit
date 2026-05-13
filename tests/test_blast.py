@@ -69,9 +69,10 @@ class BlastCommandTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            with patch("bio_toolkit.cli._build_ncbi_client", return_value=FakeBlastClient()):
+            blast_client_path = "bio_toolkit.services.blast.service._build_ncbi_client"
+            with patch(blast_client_path, return_value=FakeBlastClient()):
                 with patch(
-                    "bio_toolkit.cli._wait_for_remote_blast",
+                    "bio_toolkit.services.blast.service._wait_for_remote_blast",
                     return_value=(
                         BlastSearchInfo(rid="TEST-RID-001", status="READY", there_are_hits=True),
                         60,

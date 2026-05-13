@@ -5,6 +5,8 @@ import sys
 
 from bio_toolkit.ncbi import SearchResult
 
+_CANCEL_SELECTION = object()
+
 
 class InteractivePickerError(RuntimeError):
     """Raised when terminal selection cannot run."""
@@ -22,7 +24,7 @@ def pick_search_result(results: list[SearchResult]) -> SearchResult:
         questionary.Choice(title=format_search_choice(result), value=result) for result in results
     ]
     choices.append(questionary.Separator())
-    choices.append(questionary.Choice(title="Cancel", value=None))
+    choices.append(questionary.Choice(title="Cancel", value=_CANCEL_SELECTION))
 
     answer = questionary.select(
         "Select a search result",
@@ -31,7 +33,7 @@ def pick_search_result(results: list[SearchResult]) -> SearchResult:
         use_indicator=True,
     ).ask()
 
-    if answer is None:
+    if answer is None or answer is _CANCEL_SELECTION:
         raise InteractivePickerCancelled("Interactive selection cancelled.")
     return answer
 
@@ -51,7 +53,7 @@ def pick_post_search_action(result: SearchResult) -> str:
             questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
             questionary.Choice("Print accession only", value="print_accession"),
             questionary.Separator(),
-            questionary.Choice("Cancel", value=None),
+            questionary.Choice("Cancel", value=_CANCEL_SELECTION),
         ]
     elif provider == "kegg":
         choices = [
@@ -61,7 +63,7 @@ def pick_post_search_action(result: SearchResult) -> str:
             questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
             questionary.Choice("Print accession only", value="print_accession"),
             questionary.Separator(),
-            questionary.Choice("Cancel", value=None),
+            questionary.Choice("Cancel", value=_CANCEL_SELECTION),
         ]
     else:
         choices = [
@@ -73,7 +75,7 @@ def pick_post_search_action(result: SearchResult) -> str:
             questionary.Choice("Fetch, save, and analyze", value="fetch_analyze"),
             questionary.Choice("Print accession only", value="print_accession"),
             questionary.Separator(),
-            questionary.Choice("Cancel", value=None),
+            questionary.Choice("Cancel", value=_CANCEL_SELECTION),
         ]
 
     answer = questionary.select(
@@ -83,7 +85,7 @@ def pick_post_search_action(result: SearchResult) -> str:
         use_indicator=True,
     ).ask()
 
-    if answer is None:
+    if answer is None or answer is _CANCEL_SELECTION:
         raise InteractivePickerCancelled("Interactive action selection cancelled.")
     return answer
 
@@ -104,12 +106,12 @@ def prompt_guided_search() -> dict[str, str | int]:
             questionary.Choice("Search records", value="search"),
             questionary.Choice("Query API details", value="query"),
             questionary.Separator(),
-            questionary.Choice("Cancel", value=None),
+            questionary.Choice("Cancel", value=_CANCEL_SELECTION),
         ],
         instruction="Use arrows to move, Enter to confirm",
         use_indicator=True,
     ).ask()
-    if mode is None:
+    if mode is None or mode is _CANCEL_SELECTION:
         raise InteractivePickerCancelled("Guided search cancelled.")
 
     query = questionary.text("What do you want to search for?").ask()
@@ -127,7 +129,7 @@ def prompt_guided_search() -> dict[str, str | int]:
     provider_choices.extend(
         [
             questionary.Separator(),
-            questionary.Choice("Cancel", value=None),
+            questionary.Choice("Cancel", value=_CANCEL_SELECTION),
         ]
     )
     provider = questionary.select(
@@ -140,7 +142,7 @@ def prompt_guided_search() -> dict[str, str | int]:
         instruction="Use arrows to move, Enter to confirm",
         use_indicator=True,
     ).ask()
-    if provider is None:
+    if provider is None or provider is _CANCEL_SELECTION:
         raise InteractivePickerCancelled("Guided search cancelled.")
 
     limit = 1 if str(provider) == "alphafold" else 10
@@ -151,12 +153,12 @@ def prompt_guided_search() -> dict[str, str | int]:
                 questionary.Choice("Nucleotide", value="nucleotide"),
                 questionary.Choice("Protein", value="protein"),
                 questionary.Separator(),
-                questionary.Choice("Cancel", value=None),
+                questionary.Choice("Cancel", value=_CANCEL_SELECTION),
             ],
             instruction="Use arrows to move, Enter to confirm",
             use_indicator=True,
         ).ask()
-        if database is None:
+        if database is None or database is _CANCEL_SELECTION:
             raise InteractivePickerCancelled("Guided search cancelled.")
         organism = questionary.text("Organism filter (optional)", default="").ask()
         if organism is None:
@@ -171,12 +173,12 @@ def prompt_guided_search() -> dict[str, str | int]:
                 questionary.Choice("Enzyme", value="enzyme"),
                 questionary.Choice("Disease", value="disease"),
                 questionary.Separator(),
-                questionary.Choice("Cancel", value=None),
+                questionary.Choice("Cancel", value=_CANCEL_SELECTION),
             ],
             instruction="Use arrows to move, Enter to confirm",
             use_indicator=True,
         ).ask()
-        if database is None:
+        if database is None or database is _CANCEL_SELECTION:
             raise InteractivePickerCancelled("Guided search cancelled.")
         organism = ""
     elif str(provider) == "uniprot":
@@ -194,14 +196,11 @@ def prompt_guided_search() -> dict[str, str | int]:
             raise InteractivePickerCancelled("Guided search cancelled.")
 
     if str(provider) != "alphafold":
-        limit_text = questionary.text("How many results?", default="10").ask()
+        limit_text = questionary.text("How many results? [default: 10]", default="").ask()
         if limit_text is None:
             raise InteractivePickerCancelled("Guided search cancelled.")
 
-        try:
-            limit = int(str(limit_text).strip())
-        except ValueError as exc:
-            raise InteractivePickerError("Guided search limit must be a whole number.") from exc
+        limit = _parse_guided_search_limit(limit_text, default_limit=10)
 
     return {
         "mode": str(mode),
@@ -218,6 +217,17 @@ def _ensure_tty() -> None:
         raise InteractivePickerError(
             "Interactive selection requires a TTY-capable terminal session."
         )
+
+
+def _parse_guided_search_limit(limit_text: str, *, default_limit: int) -> int:
+    clean_limit = str(limit_text).strip()
+    if not clean_limit:
+        return default_limit
+
+    try:
+        return int(clean_limit)
+    except ValueError as exc:
+        raise InteractivePickerError("Guided search limit must be a whole number.") from exc
 
 
 def _load_questionary():

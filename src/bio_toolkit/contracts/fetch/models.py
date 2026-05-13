@@ -6,4 +6,5 @@ class FetchedRecord(ContractModel):
     database: str
     rettype: str
     source: str
+    provider: str
     content: str
